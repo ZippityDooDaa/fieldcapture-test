@@ -277,7 +277,9 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                         job.completed ? 'opacity-50' : ''
                       } ${isActive ? 'bg-destructive/5' : ''}`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-3 justify-between">
+                        {/* Left side: Checkbox + Content */}
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
                         {/* Checkbox */}
                         <button
                           onClick={(e) => toggleComplete(job, e)}
@@ -406,9 +408,10 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                             </button>
                           )}
                         </div>
+                        </div>
 
-                        {/* Quick Start/Stop Button with Timer */}
-                        <div className="flex flex-col items-center gap-1 flex-shrink-0 pl-2">
+                        {/* Right side: Quick Start/Stop Button with Timer */}
+                        <div className="flex flex-col items-center gap-1 flex-shrink-0 pl-2 self-start">
                           <button
                             onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
