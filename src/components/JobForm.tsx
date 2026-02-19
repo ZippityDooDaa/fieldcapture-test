@@ -50,7 +50,29 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
 
   useEffect(() => {
     loadClients();
-  }, []);
+    
+    // If editing, load existing job data
+    if (jobId) {
+      loadExistingJob();
+    }
+  }, [jobId]);
+
+  async function loadExistingJob() {
+    if (!jobId) return;
+    const { getJob } = await import('@/lib/storage');
+    const existing = await getJob(jobId);
+    if (existing) {
+      setValue('clientRef', existing.clientRef);
+      setValue('notes', existing.notes);
+      setValue('priority', existing.priority);
+      
+      const jobDateObj = new Date(existing.createdAt);
+      setJobDate(jobDateObj.toISOString().split('T')[0]);
+      const hours = jobDateObj.getHours().toString().padStart(2, '0');
+      const mins = jobDateObj.getMinutes().toString().padStart(2, '0');
+      setJobTime(`${hours}:${mins}`);
+    }
+  }
 
   useEffect(() => {
     const client = clients.find(c => c.ref === selectedClientRef);
@@ -103,12 +125,14 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
       // Update existing
       const existing = await import('@/lib/storage').then(m => m.getJob(jobId));
       if (existing) {
+        const dateTime = new Date(`${jobDate}T${jobTime}`);
         await updateJob({
           ...existing,
           clientRef: data.clientRef,
           clientName: client.name,
           notes: data.notes,
           priority: data.priority as 1 | 2 | 3 | 4 | 5,
+          createdAt: dateTime.getTime(),
           synced: 0,
         });
       }
@@ -208,42 +232,40 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
           </div>
 
           {/* Date & Time */}
-          {!jobId && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-fg mb-1">
-                  <Calendar className="w-4 h-4 inline mr-1" />
-                  Date
-                  {parsedDate && (
-                    <span className="text-primary ml-2 text-xs">
-                      (auto-detected from notes)
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="date"
-                  value={jobDate}
-                  onChange={(e) => {
-                    setJobDate(e.target.value);
-                    setParsedDate(null); // Clear auto-detected when manually changed
-                  }}
-                  className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-fg mb-1">
-                  <Clock className="w-4 h-4 inline mr-1" />
-                  Time
-                </label>
-                <input
-                  type="time"
-                  value={jobTime}
-                  onChange={(e) => setJobTime(e.target.value)}
-                  className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                Date
+                {parsedDate && (
+                  <span className="text-primary ml-2 text-xs">
+                    (auto-detected from notes)
+                  </span>
+                )}
+              </label>
+              <input
+                type="date"
+                value={jobDate}
+                onChange={(e) => {
+                  setJobDate(e.target.value);
+                  setParsedDate(null); // Clear auto-detected when manually changed
+                }}
+                className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">
+                <Clock className="w-4 h-4 inline mr-1" />
+                Time
+              </label>
+              <input
+                type="time"
+                value={jobTime}
+                onChange={(e) => setJobTime(e.target.value)}
+                className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
 
           {/* Priority */}
           <div>

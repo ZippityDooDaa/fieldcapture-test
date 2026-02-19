@@ -66,6 +66,6 @@ export const PRIORITY_LABELS = {
   1: 'P1 - Critical',
   2: 'P2 - High',
   3: 'P3 - Medium',
-  4: 'P4 - Low',
-  5: 'P5 - Normal',
+  4: 'P4 - Normal',
+  5: 'P5 - Low',
 } as const;

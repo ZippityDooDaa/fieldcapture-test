@@ -17,30 +17,36 @@ interface SessionEditorProps {
 }
 
 function SessionEditor({ session, onSave, onCancel }: SessionEditorProps) {
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date(session.startedAt);
-    return d.toISOString().split('T')[0];
-  });
-  const [startTime, setStartTime] = useState(() => {
-    const d = new Date(session.startedAt);
-    return d.toTimeString().slice(0, 5);
-  });
-  const [endDate, setEndDate] = useState(() => {
-    if (!session.endedAt) return '';
-    const d = new Date(session.endedAt);
-    return d.toISOString().split('T')[0];
-  });
-  const [endTime, setEndTime] = useState(() => {
-    if (!session.endedAt) return '';
-    const d = new Date(session.endedAt);
-    return d.toTimeString().slice(0, 5);
-  });
+  // Initialize from session timestamps - keep date and time separate
+  const startDateObj = new Date(session.startedAt);
+  const [startDate, setStartDate] = useState(startDateObj.toISOString().split('T')[0]);
+  const [startTime, setStartTime] = useState(
+    startDateObj.getHours().toString().padStart(2, '0') + ':' + 
+    startDateObj.getMinutes().toString().padStart(2, '0')
+  );
+  
+  const endDateObj = session.endedAt ? new Date(session.endedAt) : null;
+  const [endDate, setEndDate] = useState(endDateObj ? endDateObj.toISOString().split('T')[0] : '');
+  const [endTime, setEndTime] = useState(
+    endDateObj 
+      ? endDateObj.getHours().toString().padStart(2, '0') + ':' + endDateObj.getMinutes().toString().padStart(2, '0')
+      : ''
+  );
 
   function handleSave() {
-    const startedAt = new Date(`${startDate}T${startTime}`).getTime();
-    const endedAt = endDate && endTime ? new Date(`${endDate}T${endTime}`).getTime() : null;
+    // Parse dates explicitly to avoid timezone issues
+    const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const startedAt = new Date(startYear, startMonth - 1, startDay, startHour, startMinute).getTime();
     
-    const durationMin = endedAt 
+    let endedAt: number | null = null;
+    if (endDate && endTime) {
+      const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      endedAt = new Date(endYear, endMonth - 1, endDay, endHour, endMinute).getTime();
+    }
+    
+    const durationMin = endedAt && endedAt > startedAt
       ? Math.floor((endedAt - startedAt) / 1000 / 60)
       : null;
 
@@ -48,7 +54,7 @@ function SessionEditor({ session, onSave, onCancel }: SessionEditorProps) {
       ...session,
       startedAt,
       endedAt,
-      durationMin: durationMin && durationMin > 0 ? durationMin : 1,
+      durationMin: durationMin && durationMin > 0 ? durationMin : (endedAt ? 1 : null),
     });
   }
 
@@ -333,7 +339,7 @@ export default function Timer({ job, onUpdate }: TimerProps) {
                             )}
                           </span>
                         </div>
-                        {session.durationMin && (
+                        {session.durationMin && session.durationMin > 0 && (
                           <div className="text-xs text-muted-fg mt-1">
                             {formatDurationLong(session.durationMin)}
                           </div>
