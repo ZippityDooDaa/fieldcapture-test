@@ -17,21 +17,28 @@ interface SessionEditorProps {
 }
 
 function SessionEditor({ session, onSave, onCancel }: SessionEditorProps) {
-  // Initialize from session timestamps - keep date and time separate
-  const startDateObj = new Date(session.startedAt);
-  const [startDate, setStartDate] = useState(startDateObj.toISOString().split('T')[0]);
-  const [startTime, setStartTime] = useState(
-    startDateObj.getHours().toString().padStart(2, '0') + ':' + 
-    startDateObj.getMinutes().toString().padStart(2, '0')
-  );
+  // Helper to format date as YYYY-MM-DD in local timezone
+  const formatDateLocal = (timestamp: number) => {
+    const d = new Date(timestamp);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
   
-  const endDateObj = session.endedAt ? new Date(session.endedAt) : null;
-  const [endDate, setEndDate] = useState(endDateObj ? endDateObj.toISOString().split('T')[0] : '');
-  const [endTime, setEndTime] = useState(
-    endDateObj 
-      ? endDateObj.getHours().toString().padStart(2, '0') + ':' + endDateObj.getMinutes().toString().padStart(2, '0')
-      : ''
-  );
+  // Initialize from session timestamps - keep date and time separate
+  const [startDate, setStartDate] = useState(formatDateLocal(session.startedAt));
+  const [startTime, setStartTime] = useState(() => {
+    const d = new Date(session.startedAt);
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  });
+  
+  const [endDate, setEndDate] = useState(() => {
+    if (!session.endedAt) return '';
+    return formatDateLocal(session.endedAt);
+  });
+  const [endTime, setEndTime] = useState(() => {
+    if (!session.endedAt) return '';
+    const d = new Date(session.endedAt);
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  });
 
   function handleSave() {
     // Parse dates explicitly to avoid timezone issues

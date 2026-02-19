@@ -88,13 +88,20 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     
     if (hasHotText) {
       const parsed = parseHotText(notes);
+      let changed = false;
       if (parsed.priority) {
         setParsedPriority(parsed.priority);
         setValue('priority', parsed.priority);
+        changed = true;
+        // Clear priority indicator after 3 seconds
+        setTimeout(() => setParsedPriority(null), 3000);
       }
       if (parsed.date) {
         setParsedDate(parsed.date);
         setJobDate(parsed.date.toISOString().split('T')[0]);
+        changed = true;
+        // Clear date indicator after 3 seconds
+        setTimeout(() => setParsedDate(null), 3000);
       }
       // Only update notes if there's actual text to remove
       if (parsed.text !== notes) {
@@ -175,16 +182,25 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
   return (
     <div className="h-full flex flex-col bg-bg">
       {/* Header */}
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3">
+      <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onCancel}
+            className="p-2 -ml-2 hover:bg-slate rounded-full transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-fg" />
+          </button>
+          <h1 className="text-lg font-semibold text-fg">
+            {jobId ? 'Edit Job' : 'New Job'}
+          </h1>
+        </div>
         <button
-          onClick={onCancel}
-          className="p-2 -ml-2 hover:bg-slate rounded-full transition-colors"
+          onClick={handleSubmit(onSubmit)}
+          disabled={loading || !selectedClientRef}
+          className="bg-primary text-dark px-4 py-2 rounded-lg font-medium text-sm disabled:opacity-50"
         >
-          <ArrowLeft className="w-5 h-5 text-fg" />
+          {loading ? 'Saving...' : 'Save'}
         </button>
-        <h1 className="text-lg font-semibold text-fg">
-          {jobId ? 'Edit Job' : 'New Job'}
-        </h1>
       </div>
 
       {/* Form */}
@@ -238,8 +254,8 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
                 <Calendar className="w-4 h-4 inline mr-1" />
                 Date
                 {parsedDate && (
-                  <span className="text-primary ml-2 text-xs">
-                    (auto-detected from notes)
+                  <span className="text-primary ml-1 text-xs">
+                    (auto-date)
                   </span>
                 )}
               </label>
@@ -248,9 +264,10 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
                 value={jobDate}
                 onChange={(e) => {
                   setJobDate(e.target.value);
-                  setParsedDate(null); // Clear auto-detected when manually changed
+                  setParsedDate(null);
                 }}
-                className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
+                className="w-full px-3 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary text-base"
+                style={{ minWidth: '140px' }}
               />
             </div>
             <div>
@@ -262,7 +279,8 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
                 type="time"
                 value={jobTime}
                 onChange={(e) => setJobTime(e.target.value)}
-                className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
+                className="w-full px-3 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary text-base"
+                style={{ minWidth: '100px' }}
               />
             </div>
           </div>
@@ -273,8 +291,8 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
               <Flag className="w-4 h-4 inline mr-1" />
               Priority
               {parsedPriority && (
-                <span className="text-primary ml-2 text-xs">
-                  (auto-detected from notes)
+                <span className="text-primary ml-1 text-xs">
+                  (auto)
                 </span>
               )}
             </label>

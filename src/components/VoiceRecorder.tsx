@@ -22,6 +22,7 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recordingTimeRef = useRef<number>(0);
 
   // Load voice notes
   const loadVoiceNotes = useCallback(async () => {
@@ -79,10 +80,10 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
         }
       };
 
-      // Capture the final recording time before clearing interval
-      const finalDuration = recordingTime;
-
       mediaRecorder.onstop = async () => {
+        // Get the actual final duration from the ref
+        const finalDuration = recordingTimeRef.current;
+        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
@@ -92,7 +93,7 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
             id: uuidv4(),
             jobId,
             audioBlob: base64data,
-            duration: finalDuration > 0 ? finalDuration : 1, // Ensure at least 1 second
+            duration: finalDuration > 0 ? finalDuration : 1,
             createdAt: Date.now(),
           };
           await addVoiceNote(voiceNote);
@@ -117,9 +118,14 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      recordingTimeRef.current = 0;
       
       recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime(prev => {
+          const newTime = prev + 1;
+          recordingTimeRef.current = newTime;
+          return newTime;
+        });
       }, 1000);
     } catch (err) {
       console.error('Recording error:', err);

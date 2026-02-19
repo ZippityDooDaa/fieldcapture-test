@@ -408,10 +408,10 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                         </div>
 
                         {/* Quick Start/Stop Button with Timer */}
-                        <div className="flex flex-col items-center gap-1 ml-auto mr-2">
+                        <div className="flex flex-col items-center gap-1 flex-shrink-0">
                           <button
                             onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
-                            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                               isActive 
                                 ? 'bg-destructive text-white hover:bg-destructive/90' 
                                 : 'bg-slate text-fg hover:bg-primary hover:text-dark'
