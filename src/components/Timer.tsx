@@ -130,7 +130,7 @@ function SessionEditor({ session, onSave, onCancel }: SessionEditorProps) {
 export default function Timer({ job, onUpdate }: TimerProps) {
   const [elapsed, setElapsed] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [showSessions, setShowSessions] = useState(false);
+  const [showSessions, setShowSessions] = useState(job.sessions.length > 0);
   const [editingSession, setEditingSession] = useState<string | null>(null);
 
   // Get active session (one without endedAt)

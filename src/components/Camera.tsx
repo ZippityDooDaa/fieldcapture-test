@@ -405,7 +405,13 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
               
               {/* Camera App Button */}
               <button
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (cameraInputRef.current) {
+                    cameraInputRef.current.click();
+                  }
+                }}
                 className="w-full bg-slate border border-border rounded-lg py-4 flex flex-col items-center gap-1 text-muted-fg hover:border-primary hover:text-primary transition-colors"
               >
                 <Camera className="w-6 h-6" />

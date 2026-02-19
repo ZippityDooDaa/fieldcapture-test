@@ -408,7 +408,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                         </div>
 
                         {/* Quick Start/Stop Button with Timer */}
-                        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                        <div className="flex flex-col items-center gap-1 flex-shrink-0 pl-2">
                           <button
                             onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${

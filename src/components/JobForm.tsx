@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS } from '@/types';
 import { createJob, updateJob, getAllClients, seedClients, updateClientLastUsed, initDB, parseHotText } from '@/lib/storage';
@@ -25,8 +25,10 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
   const [selectedClientName, setSelectedClientName] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [jobDate, setJobDate] = useState(() => {
+    // Use local date, not UTC
     const d = new Date();
-    return d.toISOString().split('T')[0];
+    const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return localDate;
   });
   const [jobTime, setJobTime] = useState(() => {
     // Default to 00:00 for new jobs (no specific time)
@@ -67,7 +69,9 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
       setValue('priority', existing.priority);
       
       const jobDateObj = new Date(existing.createdAt);
-      setJobDate(jobDateObj.toISOString().split('T')[0]);
+      // Use local date, not UTC
+      const localDate = `${jobDateObj.getFullYear()}-${String(jobDateObj.getMonth() + 1).padStart(2, '0')}-${String(jobDateObj.getDate()).padStart(2, '0')}`;
+      setJobDate(localDate);
       const hours = jobDateObj.getHours().toString().padStart(2, '0');
       const mins = jobDateObj.getMinutes().toString().padStart(2, '0');
       setJobTime(`${hours}:${mins}`);
@@ -79,34 +83,37 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     setSelectedClientName(client?.name || '');
   }, [selectedClientRef, clients]);
 
-  // Parse hot text in notes - with debounce to not interfere with typing
+  // Parse hot text in notes
+  const notesInputRef = useRef<HTMLTextAreaElement>(null);
+  const lastNotesLength = useRef<number>(0);
+  
   useEffect(() => {
     if (!notes) return;
     
-    // Only process if there's actual hot text to remove
+    // Only process if text got shorter (hot text was removed) or on initial load
+    if (notes.length < lastNotesLength.current || lastNotesLength.current === 0) {
+      lastNotesLength.current = notes.length;
+      return;
+    }
+    lastNotesLength.current = notes.length;
+    
+    // Check for hot text patterns
     const hasHotText = /\bP[1-5]\b|\btod(?:ay)?\b|\btom(?:orrow)?\b|\bnext week\b|\bnext\s+(?:sun|mon|tue|wed|thu|fri|sat)\b/i.test(notes);
     
     if (hasHotText) {
       const parsed = parseHotText(notes);
-      let changed = false;
       if (parsed.priority) {
         setParsedPriority(parsed.priority);
         setValue('priority', parsed.priority);
-        changed = true;
-        // Clear priority indicator after 3 seconds
-        setTimeout(() => setParsedPriority(null), 3000);
       }
       if (parsed.date) {
         setParsedDate(parsed.date);
-        setJobDate(parsed.date.toISOString().split('T')[0]);
-        changed = true;
-        // Clear date indicator after 3 seconds
-        setTimeout(() => setParsedDate(null), 3000);
+        // Format date properly for local timezone
+        const d = parsed.date;
+        const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        setJobDate(localDate);
       }
-      // Only update notes if there's actual text to remove
-      if (parsed.text !== notes) {
-        setValue('notes', parsed.text, { shouldValidate: false });
-      }
+      // Don't auto-remove hot text anymore - let user see it highlighted
     }
   }, [notes, setValue]);
 
