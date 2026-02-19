@@ -277,13 +277,11 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                         job.completed ? 'opacity-50' : ''
                       } ${isActive ? 'bg-destructive/5' : ''}`}
                     >
-                      <div className="flex items-start gap-3 justify-between">
-                        {/* Left side: Checkbox + Content */}
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                        {/* Checkbox */}
+                      <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-start">
+                        {/* Checkbox - col 1 */}
                         <button
                           onClick={(e) => toggleComplete(job, e)}
-                          className="mt-0.5 flex-shrink-0"
+                          className="mt-0.5"
                         >
                           {job.completed ? (
                             <CheckCircle2 
@@ -301,8 +299,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                           )}
                         </button>
 
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
+                        {/* Content - col 2 */}
+                        <div className="min-w-0 overflow-hidden">
                           <div className="flex items-center gap-2">
                             <span 
                               className="w-2 h-2 rounded-full flex-shrink-0"
@@ -408,10 +406,9 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                             </button>
                           )}
                         </div>
-                        </div>
 
-                        {/* Right side: Quick Start/Stop Button with Timer */}
-                        <div className="flex flex-col items-center gap-1 flex-shrink-0 pl-2 self-start">
+                        {/* Button - col 3 */}
+                        <div className="flex flex-col items-center gap-1">
                           <button
                             onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
