@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Job, PRIORITY_COLORS } from '@/types';
-import { getAllJobs, deleteJob, initDB, updateJob } from '@/lib/storage';
+import { Job, PRIORITY_COLORS, TimeSession } from '@/types';
+import { getAllJobs, deleteJob, initDB, updateJob, createSession, endSession, calculateTotalDuration, hasActiveSession, getActiveSession } from '@/lib/storage';
 import { format } from 'date-fns';
 import { 
   Trash2, 
@@ -15,7 +15,10 @@ import {
   Flag,
   MoreVertical,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Play,
+  Square,
+  AlertCircle
 } from 'lucide-react';
 
 interface JobListProps {
@@ -40,9 +43,14 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
     await initDB();
     const allJobs = await getAllJobs();
     
-    // Sort: Date → Priority → Time
+    // Sort: Active first, then Date → Priority → Time
     allJobs.sort((a, b) => {
-      // First by date (newest first)
+      // Active sessions first
+      const aActive = hasActiveSession(a);
+      const bActive = hasActiveSession(b);
+      if (aActive !== bActive) return bActive ? 1 : -1;
+      
+      // Then by date (newest first)
       const dateDiff = b.createdAt - a.createdAt;
       if (dateDiff !== 0) return dateDiff;
       
@@ -66,6 +74,51 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
       completedAt: !job.completed ? Date.now() : null,
       synced: 0,
     };
+    await updateJob(updatedJob);
+    await loadJobs();
+  }
+
+  async function handleQuickStart(job: Job, e: React.MouseEvent) {
+    e.stopPropagation();
+    
+    // End any other active sessions first
+    const activeJob = jobs.find(j => hasActiveSession(j) && j.id !== job.id);
+    if (activeJob) {
+      const updatedActiveJob = { ...activeJob };
+      const activeSession = getActiveSession(activeJob);
+      if (activeSession) {
+        const endedSession = endSession(activeSession);
+        updatedActiveJob.sessions = updatedActiveJob.sessions.map(s => 
+          s.id === endedSession.id ? endedSession : s
+        );
+        updatedActiveJob.totalDurationMin = calculateTotalDuration(updatedActiveJob.sessions);
+        updatedActiveJob.synced = 0;
+        await updateJob(updatedActiveJob);
+      }
+    }
+    
+    // Start new session for this job
+    const updatedJob = { ...job };
+    const newSession = createSession();
+    updatedJob.sessions = [...updatedJob.sessions, newSession];
+    updatedJob.synced = 0;
+    await updateJob(updatedJob);
+    await loadJobs();
+  }
+
+  async function handleQuickStop(job: Job, e: React.MouseEvent) {
+    e.stopPropagation();
+    
+    const activeSession = getActiveSession(job);
+    if (!activeSession) return;
+    
+    const updatedJob = { ...job };
+    const endedSession = endSession(activeSession);
+    updatedJob.sessions = updatedJob.sessions.map(s => 
+      s.id === endedSession.id ? endedSession : s
+    );
+    updatedJob.totalDurationMin = calculateTotalDuration(updatedJob.sessions);
+    updatedJob.synced = 0;
     await updateJob(updatedJob);
     await loadJobs();
   }
@@ -160,12 +213,16 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                   {label}
                 </div>
                 <div className="space-y-1">
-                  {dateJobs.map((job) => (
+                  {dateJobs.map((job) => {
+                    const isActive = hasActiveSession(job);
+                    const activeSession = getActiveSession(job);
+                    
+                    return (
                     <div
                       key={job.id}
                       className={`group px-4 py-3 hover:bg-slate/50 transition-colors ${
                         job.completed ? 'opacity-50' : ''
-                      }`}
+                      } ${isActive ? 'bg-destructive/5' : ''}`}
                     >
                       <div className="flex items-start gap-3">
                         {/* Checkbox */}
@@ -204,6 +261,12 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                             }`}>
                               {job.clientName}
                             </h3>
+                            {isActive && (
+                              <span className="flex items-center gap-1 text-xs text-destructive font-medium">
+                                <AlertCircle className="w-3 h-3" />
+                                ACTIVE
+                              </span>
+                            )}
                           </div>
                           
                           {/* Meta row */}
@@ -234,9 +297,9 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                           {expandedJob === job.id && job.sessions.length > 0 && (
                             <div className="mt-2 pl-4 border-l-2 border-border space-y-1">
                               {job.sessions.map((session, idx) => (
-                                <div key={session.id} className="text-xs text-muted-fg">
+                                <div key={session.id} className={`text-xs ${!session.endedAt ? 'text-destructive font-medium' : 'text-muted-fg'}`}>
                                   Session {idx + 1}: {formatDuration(session.durationMin || 0)}
-                                  {session.endedAt ? '' : ' (running)'}
+                                  {!session.endedAt && ' (RUNNING)'}
                                 </div>
                               ))}
                             </div>
@@ -260,7 +323,24 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                           )}
                         </div>
 
-                        {/* Actions */}
+                        {/* Quick Start/Stop Button */}
+                        <button
+                          onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
+                          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                            isActive 
+                              ? 'bg-destructive text-white hover:bg-destructive/90' 
+                              : 'bg-slate text-fg hover:bg-primary hover:text-dark'
+                          }`}
+                          title={isActive ? 'Stop timer' : 'Start timer'}
+                        >
+                          {isActive ? (
+                            <Square className="w-4 h-4" />
+                          ) : (
+                            <Play className="w-4 h-4 ml-0.5" />
+                          )}
+                        </button>
+
+                        {/* Delete Action */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {deleteConfirm === job.id ? (
                             <button
@@ -286,7 +366,8 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             ))}

@@ -45,6 +45,32 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
     };
   }, []);
 
+  // Connect stream to video element AFTER it renders
+  // This fixes the race condition: the video element only exists when showCamera=true,
+  // so we must assign srcObject after React renders the <video> tag
+  useEffect(() => {
+    if (showCamera && videoRef.current && streamRef.current) {
+      console.log('[Camera] Connecting stream to video element');
+      videoRef.current.srcObject = streamRef.current;
+
+      // Log when video actually starts playing
+      const video = videoRef.current;
+      const onPlaying = () => {
+        console.log('[Camera] Video playing:', video.videoWidth, 'x', video.videoHeight);
+      };
+      const onError = (e: Event) => {
+        console.error('[Camera] Video element error:', (e.target as HTMLVideoElement)?.error);
+      };
+      video.addEventListener('playing', onPlaying);
+      video.addEventListener('error', onError);
+
+      return () => {
+        video.removeEventListener('playing', onPlaying);
+        video.removeEventListener('error', onError);
+      };
+    }
+  }, [showCamera]);
+
   function stopCamera() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -56,32 +82,48 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
   async function startCamera() {
     setError(null);
     setIsLoading(true);
-    
+
     try {
       // Check if API exists
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API not supported');
+        throw new Error('Camera API not supported in this browser');
       }
-      
+
       console.log('[Camera] Attempting getUserMedia...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      console.log('[Camera] Available devices:', await navigator.mediaDevices.enumerateDevices().then(
+        devices => devices.filter(d => d.kind === 'videoinput').map(d => ({ label: d.label, id: d.deviceId }))
+      ));
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           facingMode: 'environment'
-        }, 
-        audio: false 
+        },
+        audio: false
       });
-      
+
+      const videoTrack = stream.getVideoTracks()[0];
       console.log('[Camera] getUserMedia succeeded');
+      console.log('[Camera] Video track:', videoTrack?.label, 'state:', videoTrack?.readyState, 'settings:', JSON.stringify(videoTrack?.getSettings()));
+
       streamRef.current = stream;
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      
+      // Show camera UI first so the <video> element renders,
+      // then the useEffect below will connect the stream to the video element
       setShowCamera(true);
     } catch (err: any) {
-      console.error('[Camera] getUserMedia failed:', err);
-      setError('Camera not available. Please use file upload.');
+      console.error('[Camera] getUserMedia failed:', err.name, err.message);
+      let errorMsg = 'Camera not available. ';
+      if (err.name === 'NotAllowedError') {
+        errorMsg += 'Camera permission was denied. Check browser settings.';
+      } else if (err.name === 'NotFoundError') {
+        errorMsg += 'No camera found on this device.';
+      } else if (err.name === 'NotReadableError') {
+        errorMsg += 'Camera is in use by another app.';
+      } else if (err.name === 'OverconstrainedError') {
+        errorMsg += 'Could not find a suitable camera.';
+      } else {
+        errorMsg += err.message || 'Please use file upload.';
+      }
+      setError(errorMsg);
       // Auto-open file picker as fallback
       setTimeout(() => cameraInputRef.current?.click(), 100);
     } finally {
@@ -90,8 +132,10 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
   }
 
   function capturePhoto() {
+    console.log('[Camera] Capture requested. videoRef:', !!videoRef.current, 'videoWidth:', videoRef.current?.videoWidth, 'videoHeight:', videoRef.current?.videoHeight, 'readyState:', videoRef.current?.readyState);
     if (!videoRef.current || !videoRef.current.videoWidth) {
-      console.error('[Camera] Video not ready');
+      console.error('[Camera] Video not ready - cannot capture');
+      setError('Camera not ready yet. Wait for the preview to appear, then try again.');
       return;
     }
 

@@ -79,6 +79,9 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
         }
       };
 
+      // Capture the final recording time before clearing interval
+      const finalDuration = recordingTime;
+
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
@@ -89,7 +92,7 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
             id: uuidv4(),
             jobId,
             audioBlob: base64data,
-            duration: recordingTime,
+            duration: finalDuration > 0 ? finalDuration : 1, // Ensure at least 1 second
             createdAt: Date.now(),
           };
           await addVoiceNote(voiceNote);

@@ -274,11 +274,23 @@ export default function Home() {
               onVoiceNotesChange={() => setRefreshTrigger(prev => prev + 1)}
             />
 
-            {/* Notes */}
-            {currentJob.notes && (
+            {/* Editable Notes */}
+            {currentJob && (
               <div className="bg-card rounded-lg border border-border p-4">
-                <h3 className="font-semibold text-fg mb-2">Notes</h3>
-                <p className="text-muted-fg whitespace-pre-wrap">{currentJob.notes}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-fg">Notes</h3>
+                </div>
+                <textarea
+                  value={currentJob.notes}
+                  onChange={async (e) => {
+                    const updatedJob = { ...currentJob, notes: e.target.value, synced: 0 };
+                    await updateJob(updatedJob);
+                    setCurrentJob(updatedJob);
+                  }}
+                  rows={4}
+                  className="w-full px-3 py-2 bg-slate text-fg border border-border rounded-lg resize-none focus:outline-none focus:border-primary text-sm"
+                  placeholder="Add notes..."
+                />
               </div>
             )}
           </>

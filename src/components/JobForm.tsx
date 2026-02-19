@@ -67,6 +67,10 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
       if (parsed.date) {
         setJobDate(parsed.date.toISOString().split('T')[0]);
       }
+      // Update notes with cleaned text (Pn removed)
+      if (parsed.text !== notes) {
+        setValue('notes', parsed.text);
+      }
     }
   }, [notes, setValue]);
 

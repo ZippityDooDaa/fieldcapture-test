@@ -340,17 +340,17 @@ export default function Timer({ job, onUpdate }: TimerProps) {
                         )}
                       </div>
                       <div className="flex items-center gap-1">
-                        {!session.endedAt && (
-                          <button
-                            onClick={() => setEditingSession(session.id)}
-                            className="p-2 text-muted-fg hover:text-fg hover:bg-muted rounded-lg transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setEditingSession(session.id)}
+                          className="p-2 text-muted-fg hover:text-fg hover:bg-muted rounded-lg transition-colors"
+                          title="Edit session times"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => deleteSession(session.id)}
                           className="p-2 text-muted-fg hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                          title="Delete session"
                         >
                           <X className="w-4 h-4" />
                         </button>

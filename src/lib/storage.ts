@@ -305,16 +305,32 @@ export async function getJobWithMedia(jobId: string) {
   };
 }
 
+// Check if job has an active (running) session
+export function hasActiveSession(job: Job): boolean {
+  if (!job.sessions || job.sessions.length === 0) return false;
+  const lastSession = job.sessions[job.sessions.length - 1];
+  return lastSession && !lastSession.endedAt;
+}
+
+// Get active session for a job
+export function getActiveSession(job: Job): TimeSession | null {
+  if (!job.sessions || job.sessions.length === 0) return null;
+  const lastSession = job.sessions[job.sessions.length - 1];
+  return lastSession && !lastSession.endedAt ? lastSession : null;
+}
+
 // Hot text parsing helpers
 export function parseHotText(text: string): { text: string; priority: number | null; date: Date | null } {
   let result = text;
   let priority: number | null = null;
   let date: Date | null = null;
 
-  // Priority patterns
+  // Priority patterns - remove P1-P5 from text after detecting
   const priorityMatch = text.match(/\bP([1-5])\b/i);
   if (priorityMatch) {
     priority = parseInt(priorityMatch[1], 10) as 1 | 2 | 3 | 4 | 5;
+    // Remove the priority marker from text
+    result = result.replace(/\s*\bP[1-5]\b\s*/i, ' ').trim();
   }
 
   // Date patterns
@@ -324,29 +340,40 @@ export function parseHotText(text: string): { text: string; priority: number | n
 
   if (lowerText.includes('tod')) {
     date = new Date(today);
+    // Remove 'tod' or 'today' from text
+    result = result.replace(/\s*\btoday?\b\s*/gi, ' ').trim();
   } else if (lowerText.includes('tom')) {
     date = new Date(today);
     date.setDate(date.getDate() + 1);
+    // Remove 'tom' or 'tomorrow' from text
+    result = result.replace(/\s*\btom(?:orrow)?\b\s*/gi, ' ').trim();
   } else if (lowerText.includes('next week')) {
     date = new Date(today);
     // Next Tuesday
     const dayOfWeek = date.getDay();
     const daysUntilTuesday = (2 - dayOfWeek + 7) % 7 || 7;
-    date.setDate(date.getDate() + daysUntilTuesday);
+    date.setDate(date.getDate() + daysUntilTuesday + 7);
+    // Remove 'next week' from text
+    result = result.replace(/\s*\bnext week\b\s*/gi, ' ').trim();
   } else {
     // Check for "next Xday"
     const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    const nextDayMatch = lowerText.match(/next\s+(sun|mon|tue|wed|thu|fri|sat)/);
+    const nextDayMatch = lowerText.match(/next\s+(sun|mon|tue|wed|thu|fri|sat)/i);
     if (nextDayMatch) {
-      const targetDay = days.indexOf(nextDayMatch[1]);
+      const targetDay = days.indexOf(nextDayMatch[1].toLowerCase());
       if (targetDay !== -1) {
         date = new Date(today);
         const currentDay = date.getDay();
         const daysUntilTarget = (targetDay - currentDay + 7) % 7 || 7;
         date.setDate(date.getDate() + daysUntilTarget);
+        // Remove 'next Xday' from text
+        result = result.replace(new RegExp(`\\s*\\bnext\\s+${nextDayMatch[1]}\\b\\s*`, 'gi'), ' ').trim();
       }
     }
   }
+
+  // Clean up extra spaces
+  result = result.replace(/\s+/g, ' ').trim();
 
   return { text: result, priority, date };
 }
