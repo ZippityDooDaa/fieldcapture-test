@@ -245,6 +245,16 @@ export default function Timer({ job, onUpdate }: TimerProps) {
   const hasSessions = job.sessions.length > 0;
   const isComplete = !isRunning && hasSessions;
 
+  // Calculate total duration including running session for display
+  function getDisplayTotalMinutes(): number {
+    const completedTotal = job.totalDurationMin || 0;
+    if (isRunning && activeSession) {
+      const runningMinutes = Math.floor(elapsed / 60);
+      return completedTotal + runningMinutes;
+    }
+    return completedTotal;
+  }
+
   return (
     <div className="bg-card rounded-lg border border-border p-4">
       <div className="flex items-center justify-between mb-4">
@@ -268,9 +278,9 @@ export default function Timer({ job, onUpdate }: TimerProps) {
         }`}>
           {formatTime(elapsed)}
         </div>
-        {job.totalDurationMin > 0 && (
+        {getDisplayTotalMinutes() > 0 && (
           <p className="text-sm text-muted-fg mt-2">
-            Total: {formatDurationLong(job.totalDurationMin)}
+            Total: {formatDurationLong(getDisplayTotalMinutes())}
           </p>
         )}
       </div>

@@ -333,10 +333,16 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                           <div className="flex items-center gap-3 mt-1 text-xs text-muted-fg">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {job.totalDurationMin > 0 
-                                ? formatDuration(job.totalDurationMin)
-                                : 'No time'
-                              }
+                              {(() => {
+                                // Calculate total including running session
+                                let totalMin = job.totalDurationMin || 0;
+                                if (isActive && activeTimers[job.id]) {
+                                  totalMin += Math.floor(activeTimers[job.id] / 60);
+                                }
+                                return totalMin > 0 
+                                  ? formatDuration(totalMin)
+                                  : 'No time';
+                              })()}
                             </span>
                             {/* Show scheduled time if set (not 00:00) */}
                             {(() => {
