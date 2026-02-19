@@ -33,6 +33,23 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [activeTimers, setActiveTimers] = useState<Record<string, number>>({});
+
+  // Update active timers every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const timers: Record<string, number> = {};
+      jobs.forEach(job => {
+        const activeSession = getActiveSession(job);
+        if (activeSession) {
+          timers[job.id] = Math.floor((Date.now() - activeSession.startedAt) / 1000);
+        }
+      });
+      setActiveTimers(timers);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [jobs]);
 
   useEffect(() => {
     loadJobs();
@@ -145,6 +162,16 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+
+  function formatActiveTime(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
   function getPriorityColor(priority: number): string {
@@ -323,22 +350,29 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                           )}
                         </div>
 
-                        {/* Quick Start/Stop Button */}
-                        <button
-                          onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
-                          className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                            isActive 
-                              ? 'bg-destructive text-white hover:bg-destructive/90' 
-                              : 'bg-slate text-fg hover:bg-primary hover:text-dark'
-                          }`}
-                          title={isActive ? 'Stop timer' : 'Start timer'}
-                        >
-                          {isActive ? (
-                            <Square className="w-4 h-4" />
-                          ) : (
-                            <Play className="w-4 h-4 ml-0.5" />
+                        {/* Quick Start/Stop Button with Timer */}
+                        <div className="flex flex-col items-center gap-1">
+                          <button
+                            onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
+                            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                              isActive 
+                                ? 'bg-destructive text-white hover:bg-destructive/90' 
+                                : 'bg-slate text-fg hover:bg-primary hover:text-dark'
+                            }`}
+                            title={isActive ? 'Stop timer' : 'Start timer'}
+                          >
+                            {isActive ? (
+                              <Square className="w-4 h-4" />
+                            ) : (
+                              <Play className="w-4 h-4 ml-0.5" />
+                            )}
+                          </button>
+                          {isActive && activeTimers[job.id] && (
+                            <span className="text-xs font-mono font-medium text-destructive">
+                              {formatActiveTime(activeTimers[job.id])}
+                            </span>
                           )}
-                        </button>
+                        </div>
 
                         {/* Delete Action */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

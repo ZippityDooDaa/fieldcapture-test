@@ -56,9 +56,14 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     setSelectedClientName(client?.name || '');
   }, [selectedClientRef, clients]);
 
-  // Parse hot text in notes
+  // Parse hot text in notes - with debounce to not interfere with typing
   useEffect(() => {
-    if (notes) {
+    if (!notes) return;
+    
+    // Only process if there's actual hot text to remove
+    const hasHotText = /\bP[1-5]\b|\btod(?:ay)?\b|\btom(?:orrow)?\b|\bnext week\b|\bnext\s+(?:sun|mon|tue|wed|thu|fri|sat)\b/i.test(notes);
+    
+    if (hasHotText) {
       const parsed = parseHotText(notes);
       if (parsed.priority) {
         setParsedPriority(parsed.priority);
@@ -67,9 +72,9 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
       if (parsed.date) {
         setJobDate(parsed.date.toISOString().split('T')[0]);
       }
-      // Update notes with cleaned text (Pn removed)
+      // Only update notes if there's actual text to remove
       if (parsed.text !== notes) {
-        setValue('notes', parsed.text);
+        setValue('notes', parsed.text, { shouldValidate: false });
       }
     }
   }, [notes, setValue]);

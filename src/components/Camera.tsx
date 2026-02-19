@@ -18,6 +18,7 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState<Photo | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -245,14 +246,17 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
           {photos.map((photo) => (
-            <div key={photo.id} className="relative aspect-square">
+            <div key={photo.id} className="relative aspect-square cursor-pointer" onClick={() => setViewingPhoto(photo)}>
               <img
                 src={photo.dataUrl}
                 alt={photo.caption || 'Job photo'}
-                className="w-full h-full object-cover rounded-lg"
+                className="w-full h-full object-cover rounded-lg hover:opacity-90 transition-opacity"
               />
               <button
-                onClick={() => handleDeletePhoto(photo.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeletePhoto(photo.id);
+                }}
                 className="absolute top-1 right-1 bg-destructive text-white p-1 rounded-full"
               >
                 <Trash2 className="w-3 h-3" />
@@ -264,6 +268,34 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Photo Preview Modal */}
+      {viewingPhoto && (
+        <div 
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          onClick={() => setViewingPhoto(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <button
+              onClick={() => setViewingPhoto(null)}
+              className="absolute -top-10 right-0 text-white p-2 hover:bg-white/10 rounded-full"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={viewingPhoto.dataUrl}
+              alt={viewingPhoto.caption || 'Job photo'}
+              className="max-w-full max-h-[80vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            {viewingPhoto.caption && (
+              <div className="absolute bottom-0 left-0 right-0 bg-dark/70 text-fg text-sm p-3 text-center rounded-b-lg">
+                {viewingPhoto.caption}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
