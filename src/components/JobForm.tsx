@@ -281,9 +281,12 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
             </label>
             <textarea
               {...register('notes')}
+              name="notes"
+              id="job-notes"
               rows={6}
               className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg resize-none focus:outline-none focus:border-primary"
               placeholder={`Add notes...\n\nHot text:\n• tod = today, tom = tomorrow\n• next thu = next Thursday\n• next week = next Tuesday\n• P1-P5 = priority level`}
+              style={{ WebkitAppearance: 'none', appearance: 'none' }}
             />
           </div>
         </div>

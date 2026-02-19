@@ -57,8 +57,13 @@ export default function Home() {
   }
 
   async function loadJob(jobId: string) {
-    const job = await getJob(jobId);
-    setCurrentJob(job || null);
+    try {
+      const job = await getJob(jobId);
+      setCurrentJob(job || null);
+    } catch (err) {
+      console.error('Error loading job:', err);
+      setCurrentJob(null);
+    }
   }
 
   function handleSelectJob(jobId: string) {
@@ -109,9 +114,18 @@ export default function Home() {
       }
 
       // Get full job data with media
-      const jobsWithMedia = await Promise.all(
-        unsynced.map(job => getJobWithMedia(job.id))
-      );
+      let jobsWithMedia = [];
+      try {
+        jobsWithMedia = await Promise.all(
+          unsynced.map(job => getJobWithMedia(job.id))
+        );
+      } catch (err) {
+        console.error('Error loading jobs for sync:', err);
+        setSyncMessage('Error preparing sync. Retrying...');
+        setSyncStatus('unsynced');
+        setSyncing(false);
+        return;
+      }
 
       // Send to API
       const response = await fetch('/api/sync', {
