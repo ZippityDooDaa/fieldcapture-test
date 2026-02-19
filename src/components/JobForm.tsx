@@ -29,10 +29,11 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     return d.toISOString().split('T')[0];
   });
   const [jobTime, setJobTime] = useState(() => {
-    const d = new Date();
-    return d.toTimeString().slice(0, 5);
+    // Default to 00:00 for new jobs (no specific time)
+    return '00:00';
   });
   const [parsedPriority, setParsedPriority] = useState<number | null>(null);
+  const [parsedDate, setParsedDate] = useState<Date | null>(null);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
@@ -70,6 +71,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
         setValue('priority', parsed.priority);
       }
       if (parsed.date) {
+        setParsedDate(parsed.date);
         setJobDate(parsed.date.toISOString().split('T')[0]);
       }
       // Only update notes if there's actual text to remove
@@ -212,11 +214,19 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
                 <label className="block text-sm font-medium text-fg mb-1">
                   <Calendar className="w-4 h-4 inline mr-1" />
                   Date
+                  {parsedDate && (
+                    <span className="text-primary ml-2 text-xs">
+                      (auto-detected from notes)
+                    </span>
+                  )}
                 </label>
                 <input
                   type="date"
                   value={jobDate}
-                  onChange={(e) => setJobDate(e.target.value)}
+                  onChange={(e) => {
+                    setJobDate(e.target.value);
+                    setParsedDate(null); // Clear auto-detected when manually changed
+                  }}
                   className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
                 />
               </div>

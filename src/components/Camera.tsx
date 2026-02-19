@@ -19,6 +19,17 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
   const [isLoading, setIsLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState<Photo | null>(null);
+  const [isMobile, setIsMobile] = useState(true);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+      setIsMobile(mobileRegex.test(userAgent));
+    };
+    checkMobile();
+  }, []);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -374,41 +385,55 @@ export default function CameraComponent({ jobId, onPhotosChange }: CameraProps) 
             className="hidden"
           />
           
-          {/* Take Photo Button */}
-          <button
-            onClick={startCamera}
-            disabled={isLoading}
-            className="w-full bg-card border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center gap-2 text-muted-fg hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
-          >
-            {isLoading ? (
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Camera className="w-8 h-8" />
-            )}
-            <span className="text-sm font-medium">
-              {isLoading ? 'Opening...' : 'Take Photo'}
-            </span>
-          </button>
-          
-          {/* Camera App Button */}
-          <button
-            onClick={() => cameraInputRef.current?.click()}
-            className="w-full bg-slate border border-border rounded-lg py-4 flex flex-col items-center gap-1 text-muted-fg hover:border-primary hover:text-primary transition-colors"
-          >
-            <Camera className="w-6 h-6" />
-            <span className="text-sm font-medium">Use Camera App</span>
-            <span className="text-xs text-muted-fg">Opens device camera</span>
-          </button>
-          
-          {/* Gallery Button */}
-          <button
-            onClick={() => galleryInputRef.current?.click()}
-            className="w-full bg-slate border border-border rounded-lg py-4 flex flex-col items-center gap-1 text-muted-fg hover:border-primary hover:text-primary transition-colors"
-          >
-            <ImageIcon className="w-6 h-6" />
-            <span className="text-sm font-medium">Choose from Gallery</span>
-            <span className="text-xs text-muted-fg">Select existing photo</span>
-          </button>
+          {isMobile ? (
+            <>
+              {/* Take Photo Button - Mobile Only */}
+              <button
+                onClick={startCamera}
+                disabled={isLoading}
+                className="w-full bg-card border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center gap-2 text-muted-fg hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Camera className="w-8 h-8" />
+                )}
+                <span className="text-sm font-medium">
+                  {isLoading ? 'Opening...' : 'Take Photo'}
+                </span>
+              </button>
+              
+              {/* Camera App Button */}
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                className="w-full bg-slate border border-border rounded-lg py-4 flex flex-col items-center gap-1 text-muted-fg hover:border-primary hover:text-primary transition-colors"
+              >
+                <Camera className="w-6 h-6" />
+                <span className="text-sm font-medium">Use Camera App</span>
+                <span className="text-xs text-muted-fg">Opens device camera</span>
+              </button>
+              
+              {/* Gallery Button */}
+              <button
+                onClick={() => galleryInputRef.current?.click()}
+                className="w-full bg-slate border border-border rounded-lg py-4 flex flex-col items-center gap-1 text-muted-fg hover:border-primary hover:text-primary transition-colors"
+              >
+                <ImageIcon className="w-6 h-6" />
+                <span className="text-sm font-medium">Choose from Gallery</span>
+                <span className="text-xs text-muted-fg">Select existing photo</span>
+              </button>
+            </>
+          ) : (
+            /* Desktop - Gallery Only */
+            <button
+              onClick={() => galleryInputRef.current?.click()}
+              className="w-full bg-slate border border-border rounded-lg py-6 flex flex-col items-center gap-2 text-muted-fg hover:border-primary hover:text-primary transition-colors"
+            >
+              <ImageIcon className="w-8 h-8" />
+              <span className="text-sm font-medium">Choose from Gallery</span>
+              <span className="text-xs text-muted-fg">Select existing photo from device</span>
+            </button>
+          )}
         </div>
       )}
     </div>

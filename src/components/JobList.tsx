@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Job, PRIORITY_COLORS, TimeSession } from '@/types';
-import { getAllJobs, deleteJob, initDB, updateJob, createSession, endSession, calculateTotalDuration, hasActiveSession, getActiveSession } from '@/lib/storage';
+import { getAllJobs, deleteJob, createJob, initDB, updateJob, createSession, endSession, calculateTotalDuration, hasActiveSession, getActiveSession } from '@/lib/storage';
 import { format } from 'date-fns';
 import { 
   Trash2, 
@@ -23,11 +23,12 @@ import {
 
 interface JobListProps {
   onSelectJob: (jobId: string) => void;
+  onEditJob?: (jobId: string) => void;
   onCreateNew: () => void;
   refreshTrigger: number;
 }
 
-export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: JobListProps) {
+export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTrigger }: JobListProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -97,6 +98,31 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
 
   async function handleQuickStart(job: Job, e: React.MouseEvent) {
     e.stopPropagation();
+    
+    // Check if job is from a different day
+    const jobDate = new Date(job.createdAt);
+    const today = new Date();
+    const isDifferentDay = jobDate.toDateString() !== today.toDateString();
+    
+    if (isDifferentDay) {
+      // Create new job for today
+      const newJob: Job = {
+        id: crypto.randomUUID(),
+        clientRef: job.clientRef,
+        clientName: job.clientName,
+        createdAt: Date.now(),
+        sessions: [createSession()],
+        totalDurationMin: 0,
+        notes: `Continued from ${jobDate.toLocaleDateString()}`,
+        synced: 0,
+        priority: job.priority,
+        completed: false,
+        completedAt: null,
+      };
+      await createJob(newJob);
+      await loadJobs();
+      return;
+    }
     
     // End any other active sessions first
     const activeJob = jobs.find(j => hasActiveSession(j) && j.id !== job.id);
@@ -274,18 +300,25 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                         </button>
 
                         {/* Content */}
-                        <div 
-                          className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() => onSelectJob(job.id)}
-                        >
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span 
                               className="w-2 h-2 rounded-full flex-shrink-0"
                               style={{ backgroundColor: getPriorityColor(job.priority) }}
                             />
-                            <h3 className={`font-medium truncate ${
-                              job.completed ? 'line-through text-muted-fg' : 'text-fg'
-                            }`}>
+                            <h3 
+                              className={`font-medium truncate cursor-pointer hover:text-primary ${
+                                job.completed ? 'line-through text-muted-fg' : 'text-fg'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onEditJob) {
+                                  onEditJob(job.id);
+                                } else {
+                                  onSelectJob(job.id);
+                                }
+                              }}
+                            >
                               {job.clientName}
                             </h3>
                             {isActive && (
@@ -305,6 +338,21 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
                                 : 'No time'
                               }
                             </span>
+                            {/* Show scheduled time if set (not 00:00) */}
+                            {(() => {
+                              const jobTime = new Date(job.createdAt);
+                              const hours = jobTime.getHours();
+                              const mins = jobTime.getMinutes();
+                              if (hours !== 0 || mins !== 0) {
+                                return (
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {hours.toString().padStart(2, '0')}:{mins.toString().padStart(2, '0')}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                             {job.sessions.length > 0 && (
                               <span>{job.sessions.length} session{job.sessions.length !== 1 ? 's' : ''}</span>
                             )}
@@ -315,7 +363,10 @@ export default function JobList({ onSelectJob, onCreateNew, refreshTrigger }: Jo
 
                           {/* Notes preview */}
                           {job.notes && (
-                            <p className="text-sm text-muted-fg mt-1 line-clamp-2">
+                            <p 
+                              className="text-sm text-muted-fg mt-1 line-clamp-2 cursor-pointer"
+                              onClick={() => onSelectJob(job.id)}
+                            >
                               {job.notes}
                             </p>
                           )}

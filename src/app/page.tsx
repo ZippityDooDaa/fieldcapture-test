@@ -169,12 +169,18 @@ export default function Home() {
     }
   }
 
+  function handleEditJob(jobId: string) {
+    setSelectedJobId(jobId);
+    setView('form');
+  }
+
   // List View
   if (view === 'list') {
     return (
       <div className="h-screen flex flex-col max-w-md mx-auto bg-bg">
         <JobList
           onSelectJob={handleSelectJob}
+          onEditJob={handleEditJob}
           onCreateNew={handleCreateNew}
           refreshTrigger={refreshTrigger}
         />
