@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Photo, PhotoWithMedia } from '@/types';
+import { Photo } from '@/types';
 import { addPhoto, getPhotosByJob, deletePhoto } from '@/lib/storage';
 import { v4 as uuidv4 } from 'uuid';
 import { Camera, X, Plus, Trash2 } from 'lucide-react';
