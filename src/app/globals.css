@@ -1,3 +1,76 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Nifty Color Palette */
+  --primary: #a8d600;
+  --lime-glow: #ccff00;
+  --bg: #1c1f26;
+  --card: #232730;
+  --dark: #16181f;
+  --slate: #272b35;
+  --fg: #fafafa;
+  --muted: #313540;
+  --muted-fg: #8f95a3;
+  --border: #383c47;
+  --destructive: #ff5f1f;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-bg text-fg;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--bg);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-fg);
+  }
+
+  /* Input styles */
+  input[type="date"],
+  input[type="time"] {
+    color-scheme: dark;
+  }
+
+  /* Safe area for mobile */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+@layer components {
+  /* Priority colors utility classes */
+  .priority-1 { color: #ff5f1f; }
+  .priority-2 { color: #ff9500; }
+  .priority-3 { color: #a8d600; }
+  .priority-4 { color: #007AFF; }
+  .priority-5 { color: #8f95a3; }
+  
+  .bg-priority-1 { background-color: #ff5f1f; }
+  .bg-priority-2 { background-color: #ff9500; }
+  .bg-priority-3 { background-color: #a8d600; }
+  .bg-priority-4 { background-color: #007AFF; }
+  .bg-priority-5 { background-color: #8f95a3; }
+}

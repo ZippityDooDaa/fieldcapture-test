@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import JobList from '@/components/JobList';
 import JobForm from '@/components/JobForm';
 import Timer from '@/components/Timer';
 import CameraComponent from '@/components/Camera';
 import VoiceRecorder from '@/components/VoiceRecorder';
-import { Job } from '@/types';
-import { getJob, getJobWithMedia, updateJob, initDB, seedClients, getUnsyncedJobs } from '@/lib/storage';
-import { ArrowLeft, Save, Cloud, CloudOff, Check } from 'lucide-react';
+import { Job, PRIORITY_COLORS } from '@/types';
+import { getJob, getJobWithMedia, updateJob, initDB, seedClients, getUnsyncedJobs, formatDuration } from '@/lib/storage';
+import { ArrowLeft, Save, Cloud, CloudOff, Check, Flag, Clock, Calendar } from 'lucide-react';
 
 export default function Home() {
   const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
@@ -19,6 +19,7 @@ export default function Home() {
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'unsynced' | 'syncing'>('synced');
 
   useEffect(() => {
     initDatabase();
@@ -27,8 +28,21 @@ export default function Home() {
   useEffect(() => {
     if (dbReady) {
       countUnsynced();
+      // Auto-sync on open
+      handleAutoSync();
     }
-  }, [dbReady, refreshTrigger]);
+  }, [dbReady]);
+
+  // Periodic sync check
+  useEffect(() => {
+    if (!dbReady) return;
+    
+    const interval = setInterval(() => {
+      countUnsynced();
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [dbReady]);
 
   async function initDatabase() {
     await initDB();
@@ -39,6 +53,7 @@ export default function Home() {
   async function countUnsynced() {
     const jobs = await getUnsyncedJobs();
     setUnsyncedCount(jobs.length);
+    setSyncStatus(jobs.length > 0 ? 'unsynced' : 'synced');
   }
 
   async function loadJob(jobId: string) {
@@ -66,15 +81,28 @@ export default function Home() {
     setView('list');
   }
 
+  async function handleAutoSync() {
+    const unsynced = await getUnsyncedJobs();
+    if (unsynced.length > 0) {
+      setSyncStatus('syncing');
+      await performSync();
+    }
+  }
+
   async function handleSync() {
     setSyncing(true);
+    setSyncStatus('syncing');
     setSyncMessage('Syncing...');
-    
+    await performSync();
+  }
+
+  async function performSync() {
     try {
       const unsynced = await getUnsyncedJobs();
       
       if (unsynced.length === 0) {
         setSyncMessage('All jobs synced!');
+        setSyncStatus('synced');
         setTimeout(() => setSyncMessage(''), 2000);
         setSyncing(false);
         return;
@@ -100,23 +128,37 @@ export default function Home() {
         const storage = await import('@/lib/storage');
         await Promise.all(unsynced.map(job => storage.markJobSynced(job.id)));
         setSyncMessage(`Synced ${unsynced.length} job(s)!`);
+        setSyncStatus('synced');
         setRefreshTrigger(prev => prev + 1);
       } else {
         setSyncMessage('Sync failed. Will retry later.');
+        setSyncStatus('unsynced');
       }
     } catch (err) {
       console.error('Sync error:', err);
       setSyncMessage('Sync failed. Check connection.');
+      setSyncStatus('unsynced');
     }
 
     setTimeout(() => setSyncMessage(''), 3000);
     setSyncing(false);
   }
 
+  function getSyncIcon() {
+    switch (syncStatus) {
+      case 'syncing':
+        return <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />;
+      case 'unsynced':
+        return <CloudOff className="w-4 h-4 text-destructive" />;
+      default:
+        return <Cloud className="w-4 h-4 text-primary" />;
+    }
+  }
+
   // List View
   if (view === 'list') {
     return (
-      <div className="h-screen flex flex-col max-w-md mx-auto bg-white">
+      <div className="h-screen flex flex-col max-w-md mx-auto bg-bg">
         <JobList
           onSelectJob={handleSelectJob}
           onCreateNew={handleCreateNew}
@@ -124,31 +166,25 @@ export default function Home() {
         />
         
         {/* Sync Bar */}
-        <div className="bg-white border-t px-4 py-2 flex items-center justify-between">
+        <div className="bg-card border-t border-border px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {unsyncedCount > 0 ? (
-              <>
-                <CloudOff className="w-4 h-4 text-orange-500" />
-                <span className="text-sm text-gray-600">{unsyncedCount} unsynced</span>
-              </>
-            ) : (
-              <>
-                <Cloud className="w-4 h-4 text-green-500" />
-                <span className="text-sm text-gray-600">Synced</span>
-              </>
-            )}
+            {getSyncIcon()}
+            <span className="text-sm text-muted-fg">
+              {syncStatus === 'syncing' ? 'Syncing...' : 
+               unsyncedCount > 0 ? `${unsyncedCount} unsynced` : 'Synced'}
+            </span>
           </div>
           <button
             onClick={handleSync}
             disabled={syncing || unsyncedCount === 0}
-            className="text-sm text-blue-600 font-medium disabled:text-gray-400"
+            className="text-sm text-primary font-medium disabled:opacity-50"
           >
             {syncing ? 'Syncing...' : 'Sync Now'}
           </button>
         </div>
         
         {syncMessage && (
-          <div className="bg-blue-100 text-blue-800 px-4 py-2 text-center text-sm">
+          <div className="bg-primary/10 text-primary px-4 py-2 text-center text-sm border-t border-primary/20">
             {syncMessage}
           </div>
         )}
@@ -159,7 +195,7 @@ export default function Home() {
   // Form View
   if (view === 'form') {
     return (
-      <div className="h-screen flex flex-col max-w-md mx-auto bg-white">
+      <div className="h-screen flex flex-col max-w-md mx-auto bg-bg">
         <JobForm
           jobId={selectedJobId}
           onSave={handleSaveJob}
@@ -171,22 +207,37 @@ export default function Home() {
 
   // Detail View
   return (
-    <div className="h-screen flex flex-col max-w-md mx-auto bg-gray-50">
+    <div className="h-screen flex flex-col max-w-md mx-auto bg-bg">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => setView('list')}
-          className="p-2 -ml-2 hover:bg-gray-100 rounded-full"
+          className="p-2 -ml-2 hover:bg-slate rounded-full transition-colors"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 text-fg" />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-semibold truncate">
-            {currentJob?.clientName || 'Job Details'}
-          </h1>
-          <p className="text-xs text-gray-500">
-            {currentJob && new Date(currentJob.createdAt).toLocaleDateString()}
-          </p>
+          <div className="flex items-center gap-2">
+            <span 
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: PRIORITY_COLORS[currentJob?.priority || 5] }}
+            />
+            <h1 className="text-lg font-semibold text-fg truncate">
+              {currentJob?.clientName || 'Job Details'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-fg">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {currentJob && new Date(currentJob.createdAt).toLocaleDateString()}
+            </span>
+            {currentJob && currentJob.totalDurationMin > 0 && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {formatDuration(currentJob.totalDurationMin)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -211,9 +262,9 @@ export default function Home() {
 
             {/* Notes */}
             {currentJob.notes && (
-              <div className="bg-white rounded-lg border p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Notes</h3>
-                <p className="text-gray-700 whitespace-pre-wrap">{currentJob.notes}</p>
+              <div className="bg-card rounded-lg border border-border p-4">
+                <h3 className="font-semibold text-fg mb-2">Notes</h3>
+                <p className="text-muted-fg whitespace-pre-wrap">{currentJob.notes}</p>
               </div>
             )}
           </>

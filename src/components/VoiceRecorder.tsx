@@ -2,9 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { VoiceNote } from '@/types';
-import { addVoiceNote, getVoiceNotesByJob, deleteVoiceNote } from '@/lib/storage';
+import { addVoiceNote, getVoiceNotesByJob, deleteVoiceNote, updateVoiceNote } from '@/lib/storage';
 import { v4 as uuidv4 } from 'uuid';
-import { Mic, Square, Play, Pause, Trash2 } from 'lucide-react';
+import { Mic, Square, Play, Pause, Trash2, Sparkles } from 'lucide-react';
 
 interface VoiceRecorderProps {
   jobId: string;
@@ -16,6 +16,7 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [transcribingId, setTranscribingId] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -31,6 +32,39 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
   useEffect(() => {
     loadVoiceNotes();
   }, [loadVoiceNotes]);
+
+  async function transcribeAudio(audioBlob: string): Promise<string | null> {
+    try {
+      // Convert base64 to blob
+      const response = await fetch(audioBlob);
+      const blob = await response.blob();
+      
+      // Create form data for Groq API
+      const formData = new FormData();
+      formData.append('file', blob, 'recording.webm');
+      formData.append('model', 'whisper-large-v3');
+      formData.append('language', 'en');
+      
+      const apiResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY || ''}`,
+        },
+        body: formData,
+      });
+
+      if (!apiResponse.ok) {
+        console.error('Transcription failed:', await apiResponse.text());
+        return null;
+      }
+
+      const data = await apiResponse.json();
+      return data.text || null;
+    } catch (err) {
+      console.error('Transcription error:', err);
+      return null;
+    }
+  }
 
   async function startRecording() {
     try {
@@ -61,6 +95,16 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
           await addVoiceNote(voiceNote);
           await loadVoiceNotes();
           onVoiceNotesChange?.();
+          
+          // Auto-transcribe after saving
+          setTranscribingId(voiceNote.id);
+          const transcript = await transcribeAudio(base64data);
+          if (transcript) {
+            const updatedVoiceNote = { ...voiceNote, transcript };
+            await updateVoiceNote(updatedVoiceNote);
+            await loadVoiceNotes();
+          }
+          setTranscribingId(null);
         };
         
         // Stop all tracks
@@ -127,41 +171,63 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
   }
 
   return (
-    <div className="bg-white rounded-lg border p-4">
+    <div className="bg-card rounded-lg border border-border p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-gray-900">Voice Notes</h3>
-        <span className="text-sm text-gray-500">{voiceNotes.length} note{voiceNotes.length !== 1 ? 's' : ''}</span>
+        <h3 className="font-semibold text-fg">Voice Notes</h3>
+        <span className="text-sm text-muted-fg">{voiceNotes.length} note{voiceNotes.length !== 1 ? 's' : ''}</span>
       </div>
 
       {/* Voice Notes List */}
       {voiceNotes.length > 0 && (
         <div className="space-y-2 mb-4">
           {voiceNotes.map((note) => (
-            <div key={note.id} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
-              <button
-                onClick={() => playingId === note.id ? pauseVoiceNote() : playVoiceNote(note)}
-                className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center flex-shrink-0"
-              >
-                {playingId === note.id ? (
-                  <Pause className="w-4 h-4" />
-                ) : (
-                  <Play className="w-4 h-4 ml-0.5" />
-                )}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-600">
-                  {formatTime(note.duration)}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {new Date(note.createdAt).toLocaleTimeString()}
-                </p>
+            <div key={note.id} className="flex flex-col gap-2 bg-slate p-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => playingId === note.id ? pauseVoiceNote() : playVoiceNote(note)}
+                  disabled={transcribingId === note.id}
+                  className="w-10 h-10 bg-primary text-dark rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-50"
+                >
+                  {playingId === note.id ? (
+                    <Pause className="w-4 h-4" />
+                  ) : (
+                    <Play className="w-4 h-4 ml-0.5" />
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-fg">
+                    {formatTime(note.duration)}
+                  </p>
+                  <p className="text-xs text-muted-fg">
+                    {new Date(note.createdAt).toLocaleTimeString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDelete(note.id)}
+                  className="p-2 text-muted-fg hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={() => handleDelete(note.id)}
-                className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              
+              {/* Transcript */}
+              {transcribingId === note.id && (
+                <div className="flex items-center gap-2 text-xs text-muted-fg animate-pulse">
+                  <Sparkles className="w-3 h-3" />
+                  <span>Transcribing...</span>
+                </div>
+              )}
+              {note.transcript && (
+                <div className="border-t border-border pt-2 mt-1">
+                  <div className="flex items-center gap-1 text-xs text-primary mb-1">
+                    <Sparkles className="w-3 h-3" />
+                    <span>🎤 Transcribed</span>
+                  </div>
+                  <p className="text-sm text-muted-fg italic">
+                    "{note.transcript}"
+                  </p>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -169,15 +235,15 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
 
       {/* Recording Interface */}
       {isRecording ? (
-        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+        <div className="bg-destructive/10 border-2 border-destructive/30 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-              <span className="font-mono text-lg">{formatTime(recordingTime)}</span>
+              <div className="w-3 h-3 bg-destructive rounded-full animate-pulse" />
+              <span className="font-mono text-lg text-fg">{formatTime(recordingTime)}</span>
             </div>
             <button
               onClick={stopRecording}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              className="bg-destructive text-white px-4 py-2 rounded-lg flex items-center gap-2"
             >
               <Square className="w-4 h-4" />
               Stop
@@ -187,7 +253,7 @@ export default function VoiceRecorder({ jobId, onVoiceNotesChange }: VoiceRecord
       ) : (
         <button
           onClick={startRecording}
-          className="w-full border-2 border-dashed border-gray-300 rounded-lg py-6 flex flex-col items-center gap-2 text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          className="w-full border-2 border-dashed border-border rounded-lg py-6 flex flex-col items-center gap-2 text-muted-fg hover:border-primary hover:text-primary transition-colors"
         >
           <Mic className="w-8 h-8" />
           <span className="text-sm font-medium">Record Voice Note</span>

@@ -1,11 +1,11 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Job, Photo, VoiceNote, Client } from '@/types';
+import { Job, Photo, VoiceNote, Client, TimeSession } from '@/types';
 
 interface FieldCaptureDB extends DBSchema {
   jobs: {
     key: string;
     value: Job;
-    indexes: { 'by-client': string; 'by-synced': number };
+    indexes: { 'by-client': string; 'by-synced': number; 'by-completed': number };
   };
   photos: {
     key: string;
@@ -28,7 +28,7 @@ interface FieldCaptureDB extends DBSchema {
 }
 
 const DB_NAME = 'fieldcapture-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let db: IDBPDatabase<FieldCaptureDB> | null = null;
 
@@ -42,6 +42,13 @@ export async function initDB(): Promise<IDBPDatabase<FieldCaptureDB>> {
         const jobStore = db.createObjectStore('jobs', { keyPath: 'id' });
         jobStore.createIndex('by-client', 'clientRef');
         jobStore.createIndex('by-synced', 'synced');
+        jobStore.createIndex('by-completed', 'completed');
+      } else {
+        // Migration: add new indexes if upgrading
+        const jobStore = transaction.objectStore('jobs');
+        if (!jobStore.indexNames.contains('by-completed')) {
+          jobStore.createIndex('by-completed', 'completed');
+        }
       }
 
       // Photos store
@@ -71,6 +78,39 @@ export async function initDB(): Promise<IDBPDatabase<FieldCaptureDB>> {
   return db;
 }
 
+// Migration helper: Convert old job format to new format
+export function migrateJob(oldJob: any): Job {
+  if (oldJob.sessions) {
+    // Already migrated
+    return oldJob as Job;
+  }
+
+  // Convert old format to new format
+  const sessions: TimeSession[] = [];
+  if (oldJob.startedAt) {
+    sessions.push({
+      id: crypto.randomUUID(),
+      startedAt: oldJob.startedAt,
+      endedAt: oldJob.endedAt,
+      durationMin: oldJob.durationMin,
+    });
+  }
+
+  return {
+    id: oldJob.id,
+    clientRef: oldJob.clientRef,
+    clientName: oldJob.clientName,
+    createdAt: oldJob.createdAt,
+    sessions,
+    totalDurationMin: oldJob.durationMin || 0,
+    notes: oldJob.notes || '',
+    synced: oldJob.synced || 0,
+    priority: oldJob.priority || 5,
+    completed: oldJob.completed || false,
+    completedAt: oldJob.completedAt || null,
+  };
+}
+
 // Job operations
 export async function createJob(job: Job): Promise<void> {
   const db = await initDB();
@@ -86,25 +126,29 @@ export async function updateJob(job: Job): Promise<void> {
 
 export async function getJob(id: string): Promise<Job | undefined> {
   const db = await initDB();
-  return db.get('jobs', id);
+  const job = await db.get('jobs', id);
+  return job ? migrateJob(job) : undefined;
 }
 
 export async function getAllJobs(): Promise<Job[]> {
   const db = await initDB();
-  return db.getAll('jobs');
+  const jobs = await db.getAll('jobs');
+  return jobs.map(migrateJob);
 }
 
 export async function getUnsyncedJobs(): Promise<Job[]> {
   const db = await initDB();
-  return db.getAllFromIndex('jobs', 'by-synced', 0);
+  const jobs = await db.getAllFromIndex('jobs', 'by-synced', 0);
+  return jobs.map(migrateJob);
 }
 
 export async function markJobSynced(id: string): Promise<void> {
   const db = await initDB();
   const job = await db.get('jobs', id);
   if (job) {
-    job.synced = 1;
-    await db.put('jobs', job);
+    const migrated = migrateJob(job);
+    migrated.synced = 1;
+    await db.put('jobs', migrated);
   }
 }
 
@@ -116,6 +160,47 @@ export async function deleteJob(id: string): Promise<void> {
   const voiceNotes = await getVoiceNotesByJob(id);
   await Promise.all(photos.map(p => deletePhoto(p.id)));
   await Promise.all(voiceNotes.map(v => deleteVoiceNote(v.id)));
+}
+
+// Session operations
+export function createSession(): TimeSession {
+  return {
+    id: crypto.randomUUID(),
+    startedAt: Date.now(),
+    endedAt: null,
+    durationMin: null,
+  };
+}
+
+export function endSession(session: TimeSession): TimeSession {
+  const endedAt = Date.now();
+  const durationMin = Math.floor((endedAt - session.startedAt) / 1000 / 60);
+  return {
+    ...session,
+    endedAt,
+    durationMin: durationMin > 0 ? durationMin : 1,
+  };
+}
+
+export function calculateTotalDuration(sessions: TimeSession[]): number {
+  return sessions.reduce((total, session) => {
+    return total + (session.durationMin || 0);
+  }, 0);
+}
+
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+export function formatDurationLong(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins} minute${mins !== 1 ? 's' : ''}`;
+  if (mins === 0) return `${hours} hour${hours !== 1 ? 's' : ''}`;
+  return `${hours}h ${mins}m`;
 }
 
 // Photo operations
@@ -136,6 +221,11 @@ export async function deletePhoto(id: string): Promise<void> {
 
 // Voice note operations
 export async function addVoiceNote(voiceNote: VoiceNote): Promise<void> {
+  const db = await initDB();
+  await db.put('voiceNotes', voiceNote);
+}
+
+export async function updateVoiceNote(voiceNote: VoiceNote): Promise<void> {
   const db = await initDB();
   await db.put('voiceNotes', voiceNote);
 }
@@ -213,4 +303,50 @@ export async function getJobWithMedia(jobId: string) {
     photos,
     voiceNotes,
   };
+}
+
+// Hot text parsing helpers
+export function parseHotText(text: string): { text: string; priority: number | null; date: Date | null } {
+  let result = text;
+  let priority: number | null = null;
+  let date: Date | null = null;
+
+  // Priority patterns
+  const priorityMatch = text.match(/\bP([1-5])\b/i);
+  if (priorityMatch) {
+    priority = parseInt(priorityMatch[1], 10) as 1 | 2 | 3 | 4 | 5;
+  }
+
+  // Date patterns
+  const lowerText = text.toLowerCase();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (lowerText.includes('tod')) {
+    date = new Date(today);
+  } else if (lowerText.includes('tom')) {
+    date = new Date(today);
+    date.setDate(date.getDate() + 1);
+  } else if (lowerText.includes('next week')) {
+    date = new Date(today);
+    // Next Tuesday
+    const dayOfWeek = date.getDay();
+    const daysUntilTuesday = (2 - dayOfWeek + 7) % 7 || 7;
+    date.setDate(date.getDate() + daysUntilTuesday);
+  } else {
+    // Check for "next Xday"
+    const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const nextDayMatch = lowerText.match(/next\s+(sun|mon|tue|wed|thu|fri|sat)/);
+    if (nextDayMatch) {
+      const targetDay = days.indexOf(nextDayMatch[1]);
+      if (targetDay !== -1) {
+        date = new Date(today);
+        const currentDay = date.getDay();
+        const daysUntilTarget = (targetDay - currentDay + 7) % 7 || 7;
+        date.setDate(date.getDate() + daysUntilTarget);
+      }
+    }
+  }
+
+  return { text: result, priority, date };
 }

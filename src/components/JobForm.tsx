@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Job, Client } from '@/types';
-import { createJob, updateJob, getAllClients, seedClients, updateClientLastUsed, initDB } from '@/lib/storage';
+import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS } from '@/types';
+import { createJob, updateJob, getAllClients, seedClients, updateClientLastUsed, initDB, parseHotText } from '@/lib/storage';
 import { v4 as uuidv4 } from 'uuid';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Calendar, Clock, Flag } from 'lucide-react';
 
 interface JobFormProps {
   jobId?: string;
@@ -16,6 +16,7 @@ interface JobFormProps {
 interface FormData {
   clientRef: string;
   notes: string;
+  priority: number;
 }
 
 export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
@@ -23,15 +24,28 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
   const [loading, setLoading] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [jobDate, setJobDate] = useState(() => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+  });
+  const [jobTime, setJobTime] = useState(() => {
+    const d = new Date();
+    return d.toTimeString().slice(0, 5);
+  });
+  const [parsedPriority, setParsedPriority] = useState<number | null>(null);
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       clientRef: '',
       notes: '',
+      priority: 5,
     }
   });
 
   const selectedClientRef = watch('clientRef');
+  const priority = watch('priority');
+  const notes = watch('notes');
 
   useEffect(() => {
     loadClients();
@@ -41,6 +55,20 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     const client = clients.find(c => c.ref === selectedClientRef);
     setSelectedClientName(client?.name || '');
   }, [selectedClientRef, clients]);
+
+  // Parse hot text in notes
+  useEffect(() => {
+    if (notes) {
+      const parsed = parseHotText(notes);
+      if (parsed.priority) {
+        setParsedPriority(parsed.priority);
+        setValue('priority', parsed.priority);
+      }
+      if (parsed.date) {
+        setJobDate(parsed.date.toISOString().split('T')[0]);
+      }
+    }
+  }, [notes, setValue]);
 
   async function loadClients() {
     await initDB();
@@ -57,6 +85,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     const client = clients.find(c => c.ref === data.clientRef);
     if (!client) return;
 
+    const dateTime = new Date(`${jobDate}T${jobTime}`);
     const now = Date.now();
     
     if (jobId) {
@@ -68,6 +97,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
           clientRef: data.clientRef,
           clientName: client.name,
           notes: data.notes,
+          priority: data.priority as 1 | 2 | 3 | 4 | 5,
           synced: 0,
         });
       }
@@ -77,12 +107,14 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
         id: uuidv4(),
         clientRef: data.clientRef,
         clientName: client.name,
-        createdAt: now,
-        startedAt: null,
-        endedAt: null,
-        durationMin: null,
+        createdAt: dateTime.getTime(),
+        sessions: [],
+        totalDurationMin: 0,
         notes: data.notes,
         synced: 0,
+        priority: data.priority as 1 | 2 | 3 | 4 | 5,
+        completed: false,
+        completedAt: null,
       };
       await createJob(newJob);
     }
@@ -97,17 +129,25 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     setShowClientDropdown(false);
   }
 
+  function handlePrioritySelect(p: number) {
+    setValue('priority', p);
+    setShowPriorityDropdown(false);
+    setParsedPriority(null);
+  }
+
+  const priorityOptions = [1, 2, 3, 4, 5];
+
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-bg">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+      <div className="bg-card border-b border-border px-4 py-3 flex items-center gap-3">
         <button
           onClick={onCancel}
-          className="p-2 -ml-2 hover:bg-gray-100 rounded-full"
+          className="p-2 -ml-2 hover:bg-slate rounded-full transition-colors"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 text-fg" />
         </button>
-        <h1 className="text-lg font-semibold">
+        <h1 className="text-lg font-semibold text-fg">
           {jobId ? 'Edit Job' : 'New Job'}
         </h1>
       </div>
@@ -117,34 +157,34 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
         <div className="space-y-4">
           {/* Client Select */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Client <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-fg mb-1">
+              Client <span className="text-destructive">*</span>
             </label>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowClientDropdown(!showClientDropdown)}
-                className={`w-full px-4 py-3 border rounded-lg text-left flex items-center justify-between bg-white ${
-                  errors.clientRef ? 'border-red-500' : 'border-gray-300'
+                className={`w-full px-4 py-3 border rounded-lg text-left flex items-center justify-between bg-card ${
+                  errors.clientRef ? 'border-destructive' : 'border-border'
                 }`}
               >
-                <span className={selectedClientName ? 'text-gray-900' : 'text-gray-400'}>
+                <span className={selectedClientName ? 'text-fg' : 'text-muted-fg'}>
                   {selectedClientName || 'Select a client...'}
                 </span>
-                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showClientDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-5 h-5 text-muted-fg transition-transform ${showClientDropdown ? 'rotate-180' : ''}`} />
               </button>
               
               {showClientDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {clients.map((client) => (
                     <button
                       key={client.ref}
                       type="button"
                       onClick={() => handleClientSelect(client)}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-0"
+                      className="w-full px-4 py-3 text-left hover:bg-slate border-b border-border last:border-0"
                     >
-                      <div className="font-medium">{client.name}</div>
-                      <div className="text-sm text-gray-500">{client.ref}</div>
+                      <div className="font-medium text-fg">{client.name}</div>
+                      <div className="text-sm text-muted-fg">{client.ref}</div>
                     </button>
                   ))}
                 </div>
@@ -152,45 +192,126 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
             </div>
             <input type="hidden" {...register('clientRef', { required: 'Please select a client' })} />
             {errors.clientRef && (
-              <p className="text-red-500 text-sm mt-1">{errors.clientRef.message}</p>
+              <p className="text-destructive text-sm mt-1">{errors.clientRef.message}</p>
             )}
+          </div>
+
+          {/* Date & Time */}
+          {!jobId && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-fg mb-1">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={jobDate}
+                  onChange={(e) => setJobDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-fg mb-1">
+                  <Clock className="w-4 h-4 inline mr-1" />
+                  Time
+                </label>
+                <input
+                  type="time"
+                  value={jobTime}
+                  onChange={(e) => setJobTime(e.target.value)}
+                  className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Priority */}
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">
+              <Flag className="w-4 h-4 inline mr-1" />
+              Priority
+              {parsedPriority && (
+                <span className="text-primary ml-2 text-xs">
+                  (auto-detected from notes)
+                </span>
+              )}
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+                className="w-full px-4 py-3 border border-border rounded-lg text-left flex items-center justify-between bg-card"
+              >
+                <span className="flex items-center gap-2">
+                  <span 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: PRIORITY_COLORS[priority as keyof typeof PRIORITY_COLORS] }}
+                  />
+                  <span className="text-fg">{PRIORITY_LABELS[priority as keyof typeof PRIORITY_LABELS]}</span>
+                </span>
+                <ChevronDown className={`w-5 h-5 text-muted-fg transition-transform ${showPriorityDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showPriorityDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+                  {priorityOptions.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => handlePrioritySelect(p)}
+                      className="w-full px-4 py-3 text-left hover:bg-slate border-b border-border last:border-0 flex items-center gap-2"
+                    >
+                      <span 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: PRIORITY_COLORS[p as keyof typeof PRIORITY_COLORS] }}
+                      />
+                      <span className="text-fg">{PRIORITY_LABELS[p as keyof typeof PRIORITY_LABELS]}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg mb-1">
               Notes
             </label>
             <textarea
               {...register('notes')}
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Add any notes about this job..."
+              rows={6}
+              className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg resize-none focus:outline-none focus:border-primary"
+              placeholder={`Add notes...\n\nHot text:\n• tod = today, tom = tomorrow\n• next thu = next Thursday\n• next week = next Tuesday\n• P1-P5 = priority level`}
             />
           </div>
         </div>
 
-        {/* Click outside to close dropdown */}
-        {showClientDropdown && (
+        {/* Click outside to close dropdowns */}
+        {(showClientDropdown || showPriorityDropdown) && (
           <div 
             className="fixed inset-0 z-0" 
-            onClick={() => setShowClientDropdown(false)}
+            onClick={() => {
+              setShowClientDropdown(false);
+              setShowPriorityDropdown(false);
+            }}
           />
         )}
       </form>
 
       {/* Footer */}
-      <div className="bg-white border-t p-4 space-y-2 safe-area-pb">
+      <div className="bg-card border-t border-border p-4 space-y-2 safe-area-pb">
         <button
           onClick={handleSubmit(onSubmit)}
           disabled={loading || !selectedClientRef}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium text-lg disabled:bg-gray-300 active:bg-blue-700"
+          className="w-full bg-primary text-dark py-3 rounded-lg font-medium text-lg disabled:opacity-50 active:opacity-90"
         >
           {loading ? 'Saving...' : jobId ? 'Save Changes' : 'Create Job'}
         </button>
         <button
           onClick={onCancel}
-          className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium"
+          className="w-full bg-muted text-fg py-3 rounded-lg font-medium"
         >
           Cancel
         </button>
