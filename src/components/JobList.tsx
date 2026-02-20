@@ -23,7 +23,8 @@ import {
   MapPin,
   Undo2,
   RefreshCw,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 
 interface JobListProps {
@@ -33,9 +34,10 @@ interface JobListProps {
   refreshTrigger: number;
   userId: string;
   onLogout?: () => void;
+  onSettings?: () => void;
 }
 
-export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTrigger, userId, onLogout }: JobListProps) {
+export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTrigger, userId, onLogout, onSettings }: JobListProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -354,6 +356,15 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />
+              </button>
+            )}
+            {onSettings && (
+              <button
+                onClick={onSettings}
+                className="bg-slate text-fg px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm flex items-center gap-1 hover:bg-slate/80"
+                title="Settings"
+              >
+                <Settings className="w-4 h-4" />
               </button>
             )}
             <button

@@ -7,6 +7,7 @@ import Timer from '@/components/Timer';
 import CameraComponent from '@/components/Camera';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import AuthScreen from '@/components/AuthScreen';
+import SettingsScreen from '@/components/SettingsScreen';
 import { Job, PRIORITY_COLORS } from '@/types';
 import { getJob, updateJob, initDB, seedClients, getUnsyncedJobs, formatDuration } from '@/lib/storage';
 import { syncService } from '@/lib/sync';
@@ -16,7 +17,7 @@ import { ArrowLeft, Save, Cloud, CloudOff, Check, Flag, Clock, Calendar, LogOut 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail' | 'settings'>('list');
   const [selectedJobId, setSelectedJobId] = useState<string | undefined>(undefined);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -153,6 +154,10 @@ export default function Home() {
     setView('form');
   }
 
+  function handleSettings() {
+    setView('settings');
+  }
+
   async function handleLogout() {
     await signOut();
     setUser(null);
@@ -183,6 +188,7 @@ export default function Home() {
           refreshTrigger={refreshTrigger}
           userId={user.id}
           onLogout={handleLogout}
+          onSettings={handleSettings}
         />
         
         {/* Sync Bar */}
@@ -220,6 +226,17 @@ export default function Home() {
           jobId={selectedJobId}
           onSave={handleSaveJob}
           onCancel={handleCancel}
+        />
+      </div>
+    );
+  }
+
+  // Settings View
+  if (view === 'settings') {
+    return (
+      <div className="h-screen flex flex-col max-w-md mx-auto bg-bg">
+        <SettingsScreen
+          onBack={() => setView('list')}
         />
       </div>
     );
