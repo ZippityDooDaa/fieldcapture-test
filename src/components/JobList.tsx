@@ -285,8 +285,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                       onTouchMove={(e) => {
                         if (swipeStartX === null) return;
                         const diff = e.touches[0].clientX - swipeStartX;
-                        // Swiping right from left edge reveals delete
-                        if (diff > 50 && e.touches[0].clientX < 100) {
+                        // Swiping right reveals delete (need 50px right swipe)
+                        if (diff > 50) {
                           setSwipedJob(job.id);
                         } else if (diff < -30) {
                           // Swiping left hides delete
