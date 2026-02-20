@@ -142,7 +142,8 @@ export default function Timer({ job, onUpdate }: TimerProps) {
     if (activeSession) {
       const now = Date.now();
       const seconds = Math.floor((now - activeSession.startedAt) / 1000);
-      setElapsed(seconds);
+      // Guard against clock skew - never show negative
+      setElapsed(Math.max(0, seconds));
       setIsRunning(true);
     } else {
       setElapsed(0);
@@ -157,7 +158,7 @@ export default function Timer({ job, onUpdate }: TimerProps) {
       interval = setInterval(() => {
         const now = Date.now();
         const seconds = Math.floor((now - activeSession.startedAt) / 1000);
-        setElapsed(seconds);
+        setElapsed(Math.max(0, seconds));
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -214,28 +215,32 @@ export default function Timer({ job, onUpdate }: TimerProps) {
       ...job,
       sessions: updatedSessions,
       totalDurationMin: totalDuration,
+      synced: 0,
     };
     
     await updateJob(updatedJob);
     await syncService.syncToServer();
+    await syncService.forceSync();
     setEditingSession(null);
     onUpdate();
   }
 
   async function deleteSession(sessionId: string) {
     if (!confirm('Delete this time session?')) return;
-    
+
     const updatedSessions = job.sessions.filter(s => s.id !== sessionId);
     const totalDuration = calculateTotalDuration(updatedSessions);
-    
+
     const updatedJob: Job = {
       ...job,
       sessions: updatedSessions,
       totalDurationMin: totalDuration,
+      synced: 0,
     };
-    
+
     await updateJob(updatedJob);
     await syncService.syncToServer();
+    await syncService.forceSync();
     onUpdate();
   }
 
