@@ -247,12 +247,23 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
       <div className="bg-card border-b border-border px-3 py-2">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-lg font-bold text-fg">Job Tracka</h1>
-          <button
-            onClick={onCreateNew}
-            className="bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm"
-          >
-            + New
-          </button>
+          <div className="flex items-center gap-2">
+            {deletedJob && (
+              <button
+                onClick={handleUndoDelete}
+                className="bg-destructive text-white px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm flex items-center gap-1"
+              >
+                <Undo2 className="w-4 h-4" />
+                Undo
+              </button>
+            )}
+            <button
+              onClick={onCreateNew}
+              className="bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm"
+            >
+              + New
+            </button>
+          </div>
         </div>
         
         {/* Search */}
@@ -512,24 +523,12 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
 
       {/* Bottom action bar */}
       <div className="bg-card border-t border-border p-4 safe-area-pb">
-        {deletedJob ? (
-          <div className="flex gap-3">
-            <button
-              onClick={handleUndoDelete}
-              className="flex-1 bg-slate text-fg py-3 rounded-lg font-medium text-base flex items-center justify-center gap-2 active:opacity-90 border border-border"
-            >
-              <Undo2 className="w-5 h-5" />
-              Undo Delete ({deletedJob.job.clientName})
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={onCreateNew}
-            className="w-full bg-primary text-dark py-3 rounded-lg font-medium text-lg active:opacity-90"
-          >
-            Start New Job
-          </button>
-        )}
+        <button
+          onClick={onCreateNew}
+          className="w-full bg-primary text-dark py-3 rounded-lg font-medium text-lg active:opacity-90"
+        >
+          Start New Job
+        </button>
       </div>
     </div>
   );
