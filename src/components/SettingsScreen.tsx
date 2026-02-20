@@ -49,6 +49,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       id: crypto.randomUUID(),
       ref,
       name: newName.trim(),
+      createdAt: Date.now(),
       lastUsedAt: 0,
     };
 
