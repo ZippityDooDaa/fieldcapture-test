@@ -7,7 +7,8 @@ import Timer from '@/components/Timer';
 import CameraComponent from '@/components/Camera';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import { Job, PRIORITY_COLORS } from '@/types';
-import { getJob, getJobWithMedia, updateJob, initDB, seedClients, getUnsyncedJobs, formatDuration } from '@/lib/storage';
+import { getJob, updateJob, initDB, seedClients, getUnsyncedJobs, formatDuration } from '@/lib/storage';
+import { syncService } from '@/lib/sync';
 import { ArrowLeft, Save, Cloud, CloudOff, Check, Flag, Clock, Calendar } from 'lucide-react';
 
 export default function Home() {
@@ -103,54 +104,14 @@ export default function Home() {
 
   async function performSync() {
     try {
-      const unsynced = await getUnsyncedJobs();
-      
-      if (unsynced.length === 0) {
-        setSyncMessage('All jobs synced!');
-        setSyncStatus('synced');
-        setTimeout(() => setSyncMessage(''), 2000);
-        setSyncing(false);
-        return;
-      }
-
-      // Get full job data with media
-      let jobsWithMedia = [];
-      try {
-        jobsWithMedia = await Promise.all(
-          unsynced.map(job => getJobWithMedia(job.id))
-        );
-      } catch (err) {
-        console.error('Error loading jobs for sync:', err);
-        setSyncMessage('Error preparing sync. Retrying...');
-        setSyncStatus('unsynced');
-        setSyncing(false);
-        return;
-      }
-
-      // Send to API
-      const response = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobs: jobsWithMedia.filter(Boolean),
-          timestamp: Date.now(),
-        }),
-      });
-
-      if (response.ok) {
-        // Mark all as synced
-        const storage = await import('@/lib/storage');
-        await Promise.all(unsynced.map(job => storage.markJobSynced(job.id)));
-        setSyncMessage(`Synced ${unsynced.length} job(s)!`);
-        setSyncStatus('synced');
-        setRefreshTrigger(prev => prev + 1);
-      } else {
-        setSyncMessage('Sync failed. Will retry later.');
-        setSyncStatus('unsynced');
-      }
+      await syncService.forceSync();
+      await countUnsynced();
+      setSyncMessage('Synced!');
+      setSyncStatus('synced');
+      setRefreshTrigger(prev => prev + 1);
     } catch (err) {
       console.error('Sync error:', err);
-      setSyncMessage('Sync failed. Check connection.');
+      setSyncMessage('Sync failed. Will retry later.');
       setSyncStatus('unsynced');
     }
 
