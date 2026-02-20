@@ -121,6 +121,11 @@ class SyncService {
       return;
     }
     
+    if (!this.userId) {
+      console.error('[Sync] No user ID, skipping sync');
+      return;
+    }
+    
     this.syncInProgress = true;
     
     try {
@@ -131,7 +136,10 @@ class SyncService {
         .gt('updated_at', this.lastSyncAt)
         .order('updated_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Sync] Database error:', error);
+        throw error;
+      }
 
       if (serverJobs && serverJobs.length > 0) {
         const localJobs = await getLocalJobs();

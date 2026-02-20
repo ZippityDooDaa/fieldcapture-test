@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Job, PRIORITY_COLORS, TimeSession } from '@/types';
 import { getAllJobs, deleteJob, createJob, initDB, updateJob, createSession, endSession, calculateTotalDuration, hasActiveSession, getActiveSession } from '@/lib/storage';
 import { syncService } from '@/lib/sync';
-import { getCurrentUser } from '@/lib/supabase';
+import { getCurrentUser, supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { 
   Trash2, 
@@ -69,10 +69,28 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   // Initialize sync service
   useEffect(() => {
     const initSync = async () => {
-      const user = await getCurrentUser();
-      if (user) {
-        await syncService.init(user.id);
-        setLastSync(new Date());
+      try {
+        let user = await getCurrentUser();
+        
+        // If no user, sign in anonymously
+        if (!user) {
+          const { data, error } = await supabase.auth.signInAnonymously();
+          if (error) {
+            console.error('[Auth] Anonymous sign-in failed:', error);
+            setSyncError('Auth failed');
+            return;
+          }
+          user = data.user;
+        }
+        
+        if (user) {
+          await syncService.init(user.id);
+          setLastSync(new Date());
+          setSyncError(null);
+        }
+      } catch (err) {
+        console.error('[Sync] Init error:', err);
+        setSyncError('Init failed');
       }
     };
     initSync();
