@@ -54,29 +54,31 @@ class SyncService {
           this.handleRealtimeUpdate(payload);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Sync] Real-time subscription status:', status);
+      });
   }
 
   private async handleRealtimeUpdate(payload: any) {
     const { eventType, new: newRecord, old: oldRecord } = payload;
-    
+
     // Get current local jobs
     const localJobs = await getLocalJobs();
-    
+
     if (eventType === 'INSERT' || eventType === 'UPDATE') {
       // Convert Supabase record to local Job format
       const job = this.supabaseToLocalJob(newRecord);
-      
+
       // Check if we have this job locally
       const existingIndex = localJobs.findIndex(j => j.id === job.id);
-      
+
       if (existingIndex >= 0) {
-        // Only update if server version is newer
         const localJob = localJobs[existingIndex];
-        const serverUpdated = new Date(job.synced || 0).getTime();
-        const localUpdated = localJob.synced || 0;
-        
-        if (serverUpdated > localUpdated) {
+        // Always accept server version if sessions changed (timer state)
+        const sessionsChanged = JSON.stringify(job.sessions) !== JSON.stringify(localJob.sessions);
+        const serverIsNewer = (job.synced || 0) > (localJob.synced || 0);
+
+        if (sessionsChanged || serverIsNewer) {
           localJobs[existingIndex] = job;
         }
       } else {
@@ -88,9 +90,9 @@ class SyncService {
         localJobs.splice(index, 1);
       }
     }
-    
+
     await saveJobs(localJobs);
-    
+
     // Notify UI of update
     window.dispatchEvent(new CustomEvent('jobs-updated'));
   }

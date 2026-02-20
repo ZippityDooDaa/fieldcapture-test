@@ -168,9 +168,11 @@ export default function Timer({ job, onUpdate }: TimerProps) {
     const updatedJob: Job = {
       ...job,
       sessions: [...job.sessions, newSession],
+      synced: 0,
     };
     await updateJob(updatedJob);
     await syncService.syncToServer();
+    await syncService.forceSync(); // Immediate broadcast
     setIsRunning(true);
     setElapsed(0);
     onUpdate();
@@ -190,10 +192,12 @@ export default function Timer({ job, onUpdate }: TimerProps) {
       ...job,
       sessions: updatedSessions,
       totalDurationMin: totalDuration,
+      synced: 0,
     };
     
     await updateJob(updatedJob);
     await syncService.syncToServer();
+    await syncService.forceSync(); // Immediate broadcast
     setIsRunning(false);
     setElapsed(endedSession.durationMin ? endedSession.durationMin * 60 : 0);
     onUpdate();
