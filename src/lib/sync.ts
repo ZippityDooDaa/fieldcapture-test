@@ -226,9 +226,8 @@ class SyncService {
           lastUsedAt: Date.now(), // Will be updated when used
         };
         
-        if (existingIndex >= 0) {
-          localClients[existingIndex] = client;
-        } else {
+        if (existingIndex === -1) {
+          // Only add clients that don't exist locally; local edits take precedence
           localClients.push(client);
         }
       }
@@ -283,6 +282,7 @@ class SyncService {
           .upsert({
             ref: client.ref,
             name: client.name,
+            support_level: client.supportLevel,
             user_id: this.userId,
           }, { onConflict: 'ref' });
         
