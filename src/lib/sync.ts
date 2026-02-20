@@ -141,7 +141,7 @@ class SyncService {
     }
   }
 
-  private async syncFromServer() {
+  public async syncFromServer() {
     if (this.syncInProgress) {
       this.pendingSync = true;
       return;

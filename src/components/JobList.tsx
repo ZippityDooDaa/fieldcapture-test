@@ -48,17 +48,24 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // Update active timers every second
+  // Update active timers every second and sync when timers are running
   useEffect(() => {
     const interval = setInterval(() => {
       const timers: Record<string, number> = {};
+      let hasActive = false;
       jobs.forEach(job => {
         const activeSession = getActiveSession(job);
         if (activeSession) {
           timers[job.id] = Math.floor((Date.now() - activeSession.startedAt) / 1000);
+          hasActive = true;
         }
       });
       setActiveTimers(timers);
+      
+      // Aggressive sync when timers are active (every 3 seconds)
+      if (hasActive && syncService) {
+        syncService.syncFromServer();
+      }
     }, 1000);
     
     return () => clearInterval(interval);
@@ -140,6 +147,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
       synced: 0,
     };
     await updateJob(updatedJob);
+    await syncService.syncToServer();
+    await syncService.forceSync();
     await loadJobs();
   }
 
@@ -168,10 +177,12 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
         location: job.location || 'OnSite',
       };
       await createJob(newJob);
+      await syncService.syncToServer();
+      await syncService.forceSync();
       await loadJobs();
       return;
     }
-    
+
     // End any other active sessions first
     const activeJob = jobs.find(j => hasActiveSession(j) && j.id !== job.id);
     if (activeJob) {
@@ -179,38 +190,43 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
       const activeSession = getActiveSession(activeJob);
       if (activeSession) {
         const endedSession = endSession(activeSession);
-        updatedActiveJob.sessions = updatedActiveJob.sessions.map(s => 
+        updatedActiveJob.sessions = updatedActiveJob.sessions.map(s =>
           s.id === endedSession.id ? endedSession : s
         );
         updatedActiveJob.totalDurationMin = calculateTotalDuration(updatedActiveJob.sessions);
         updatedActiveJob.synced = 0;
         await updateJob(updatedActiveJob);
+        await syncService.syncToServer();
       }
     }
-    
+
     // Start new session for this job
     const updatedJob = { ...job };
     const newSession = createSession();
     updatedJob.sessions = [...updatedJob.sessions, newSession];
     updatedJob.synced = 0;
     await updateJob(updatedJob);
+    await syncService.syncToServer();
+    await syncService.forceSync();
     await loadJobs();
   }
 
   async function handleQuickStop(job: Job, e: React.MouseEvent) {
     e.stopPropagation();
-    
+
     const activeSession = getActiveSession(job);
     if (!activeSession) return;
-    
+
     const updatedJob = { ...job };
     const endedSession = endSession(activeSession);
-    updatedJob.sessions = updatedJob.sessions.map(s => 
+    updatedJob.sessions = updatedJob.sessions.map(s =>
       s.id === endedSession.id ? endedSession : s
     );
     updatedJob.totalDurationMin = calculateTotalDuration(updatedJob.sessions);
     updatedJob.synced = 0;
     await updateJob(updatedJob);
+    await syncService.syncToServer();
+    await syncService.forceSync();
     await loadJobs();
   }
 
