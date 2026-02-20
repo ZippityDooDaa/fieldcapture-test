@@ -275,11 +275,11 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                     return (
                     <div
                       key={job.id}
-                      className={`group px-3 py-1 hover:bg-slate/50 transition-colors ${
+                      className={`group px-3 hover:bg-slate/50 transition-colors ${
                         job.completed ? 'opacity-50' : ''
                       } ${isActive ? 'bg-destructive/5' : ''}`}
                     >
-                      <div className="grid grid-cols-[auto_1fr_auto] gap-1.5 items-start">
+                      <div className="grid grid-cols-[auto_1fr_auto] gap-1.5 items-start py-0.5">
                         {/* Checkbox - col 1 */}
                         <button
                           onClick={(e) => toggleComplete(job, e)}
