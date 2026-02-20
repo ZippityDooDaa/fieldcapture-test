@@ -35,6 +35,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [swipedJob, setSwipedJob] = useState<string | null>(null);
+  const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [activeTimers, setActiveTimers] = useState<Record<string, number>>({});
 
   // Update active timers every second
@@ -271,198 +273,236 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                   {dateJobs.map((job) => {
                     const isActive = hasActiveSession(job);
                     const activeSession = getActiveSession(job);
+                    const isSwiped = swipedJob === job.id;
                     
                     return (
                     <div
                       key={job.id}
-                      className={`group px-3 hover:bg-slate/50 transition-colors ${
-                        job.completed ? 'opacity-50' : ''
-                      } ${isActive ? 'bg-destructive/5' : ''}`}
+                      className="relative overflow-hidden"
+                      onTouchStart={(e) => {
+                        setSwipeStartX(e.touches[0].clientX);
+                      }}
+                      onTouchMove={(e) => {
+                        if (swipeStartX === null) return;
+                        const diff = e.touches[0].clientX - swipeStartX;
+                        // Swiping right from left edge reveals delete
+                        if (diff > 50 && e.touches[0].clientX < 100) {
+                          setSwipedJob(job.id);
+                        } else if (diff < -30) {
+                          // Swiping left hides delete
+                          setSwipedJob(null);
+                        }
+                      }}
+                      onTouchEnd={() => {
+                        setSwipeStartX(null);
+                      }}
                     >
-                      <div className="grid grid-cols-[auto_1fr_auto] gap-1.5 items-start py-0.5">
-                        {/* Checkbox - col 1 */}
-                        <button
-                          onClick={(e) => toggleComplete(job, e)}
-                          className="mt-0.5"
-                        >
-                          {job.completed ? (
-                            <CheckCircle2 
-                              className="w-5 h-5" 
-                              style={{ color: getPriorityColor(job.priority) }}
-                            />
-                          ) : (
-                            <Circle 
-                              className="w-5 h-5 text-muted-fg" 
-                              style={{ 
-                                borderColor: getPriorityColor(job.priority),
-                                color: getPriorityColor(job.priority)
-                              }}
-                            />
-                          )}
-                        </button>
-
-                        {/* Content - col 2 */}
-                        <div className="min-w-0 overflow-hidden">
-                          <div className="flex items-center gap-2">
-                            <span 
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: getPriorityColor(job.priority) }}
-                            />
-                            <h3 
-                              className={`font-medium truncate cursor-pointer hover:text-primary ${
-                                job.completed ? 'line-through text-muted-fg' : 'text-fg'
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onEditJob) {
-                                  onEditJob(job.id);
-                                } else {
-                                  onSelectJob(job.id);
-                                }
-                              }}
-                            >
-                              {job.clientName}
-                            </h3>
-                            {isActive && (
-                              <span className="flex items-center gap-1 text-xs text-destructive font-medium">
-                                <AlertCircle className="w-3 h-3" />
-                                ACTIVE
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Meta row */}
-                          <div className="flex items-center gap-2 text-xs text-muted-fg flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {(() => {
-                                // Calculate total including running session
-                                let totalMin = job.totalDurationMin || 0;
-                                if (isActive && activeTimers[job.id]) {
-                                  totalMin += Math.floor(activeTimers[job.id] / 60);
-                                }
-                                return totalMin > 0 
-                                  ? formatDuration(totalMin)
-                                  : 'No time';
-                              })()}
-                            </span>
-                            {/* Location */}
-                            {job.location && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                {job.location}
-                              </span>
-                            )}
-                            {/* Show scheduled time if set (not 00:00) */}
-                            {(() => {
-                              const jobTime = new Date(job.createdAt);
-                              const hours = jobTime.getHours();
-                              const mins = jobTime.getMinutes();
-                              if (hours !== 0 || mins !== 0) {
-                                return (
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    {hours.toString().padStart(2, '0')}:{mins.toString().padStart(2, '0')}
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                            {job.sessions.length > 0 && (
-                              <span>{job.sessions.length} session{job.sessions.length !== 1 ? 's' : ''}</span>
-                            )}
-                            {job.synced === 0 && (
-                              <span className="text-primary">• Unsynced</span>
-                            )}
-                          </div>
-
-                          {/* Notes preview */}
-                          {job.notes && (
-                            <p 
-                              className="text-sm text-muted-fg line-clamp-2 cursor-pointer"
-                              onClick={() => onSelectJob(job.id)}
-                            >
-                              {job.notes}
-                            </p>
-                          )}
-
-                          {/* Expanded sessions */}
-                          {expandedJob === job.id && job.sessions.length > 0 && (
-                            <div className="pl-4 border-l-2 border-border space-y-0.5">
-                              {job.sessions.map((session, idx) => (
-                                <div key={session.id} className={`text-xs ${!session.endedAt ? 'text-destructive font-medium' : 'text-muted-fg'}`}>
-                                  Session {idx + 1}: {formatDuration(session.durationMin || 0)}
-                                  {!session.endedAt && ' (RUNNING)'}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Expand button if has sessions */}
-                          {job.sessions.length > 0 && (
+                      {/* Delete Background Layer */}
+                      <div 
+                        className={`absolute inset-y-0 left-0 bg-destructive flex items-center px-4 transition-transform duration-200 ${
+                          isSwiped ? 'translate-x-0' : '-translate-x-full'
+                        }`}
+                        style={{ width: isSwiped && deleteConfirm === job.id ? '100%' : '80px' }}
+                      >
+                        {deleteConfirm === job.id ? (
+                          <div className="flex items-center gap-4 w-full justify-center">
+                            <span className="text-white font-medium">Delete this job?</span>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setExpandedJob(expandedJob === job.id ? null : job.id);
+                                handleDelete(job.id);
+                                setSwipedJob(null);
+                                setDeleteConfirm(null);
                               }}
-                              className="flex items-center gap-1 text-xs text-muted-fg hover:text-fg"
+                              className="px-4 py-2 bg-white text-destructive rounded-lg font-medium"
                             >
-                              {expandedJob === job.id ? (
-                                <><ChevronUp className="w-3 h-3" /> Hide sessions</>
-                              ) : (
-                                <><ChevronDown className="w-3 h-3" /> Show sessions</>
-                              )}
+                              Delete
                             </button>
-                          )}
-                        </div>
-
-                        {/* Button - col 3 */}
-                        <div className="flex flex-col items-center gap-0.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirm(null);
+                                setSwipedJob(null);
+                              }}
+                              className="px-4 py-2 bg-destructive/50 text-white border border-white/30 rounded-lg font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
-                            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                              isActive 
-                                ? 'bg-destructive text-white hover:bg-destructive/90' 
-                                : 'bg-slate text-fg hover:bg-primary hover:text-dark'
-                            }`}
-                            title={isActive ? 'Stop timer' : 'Start timer'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirm(job.id);
+                            }}
+                            className="flex flex-col items-center gap-1 text-white"
                           >
-                            {isActive ? (
-                              <Square className="w-4 h-4" />
+                            <Trash2 className="w-6 h-6" />
+                            <span className="text-xs font-medium">Delete</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Job Content - slides to reveal delete */}
+                      <div 
+                        className={`relative bg-bg transition-transform duration-200 ${
+                          isSwiped ? 'translate-x-20' : 'translate-x-0'
+                        } ${job.completed ? 'opacity-50' : ''} ${isActive ? 'bg-destructive/5' : ''}`}
+                      >
+                        <div className="grid grid-cols-[auto_1fr_auto] gap-1.5 items-start py-0.5 px-3">
+                          {/* Checkbox - col 1 */}
+                          <button
+                            onClick={(e) => toggleComplete(job, e)}
+                            className="mt-0.5"
+                          >
+                            {job.completed ? (
+                              <CheckCircle2 
+                                className="w-5 h-5" 
+                                style={{ color: getPriorityColor(job.priority) }}
+                              />
                             ) : (
-                              <Play className="w-4 h-4 ml-0.5" />
+                              <Circle 
+                                className="w-5 h-5 text-muted-fg" 
+                                style={{ 
+                                  borderColor: getPriorityColor(job.priority),
+                                  color: getPriorityColor(job.priority)
+                                }}
+                              />
                             )}
                           </button>
-                          {isActive && activeTimers[job.id] && (
-                            <span className="text-xs font-mono font-medium text-destructive">
-                              {formatActiveTime(activeTimers[job.id])}
-                            </span>
-                          )}
-                        </div>
 
-                        {/* Delete Action */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {deleteConfirm === job.id ? (
+                          {/* Content - col 2 */}
+                          <div className="min-w-0 overflow-hidden">
+                            <div className="flex items-center gap-2">
+                              <span 
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: getPriorityColor(job.priority) }}
+                              />
+                              <h3 
+                                className={`font-medium truncate cursor-pointer hover:text-primary ${
+                                  job.completed ? 'line-through text-muted-fg' : 'text-fg'
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onEditJob) {
+                                    onEditJob(job.id);
+                                  } else {
+                                    onSelectJob(job.id);
+                                  }
+                                }}
+                              >
+                                {job.clientName}
+                              </h3>
+                              {isActive && (
+                                <span className="flex items-center gap-1 text-xs text-destructive font-medium">
+                                  <AlertCircle className="w-3 h-3" />
+                                  ACTIVE
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Meta row */}
+                            <div className="flex items-center gap-2 text-xs text-muted-fg flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {(() => {
+                                  let totalMin = job.totalDurationMin || 0;
+                                  if (isActive && activeTimers[job.id]) {
+                                    totalMin += Math.floor(activeTimers[job.id] / 60);
+                                  }
+                                  return totalMin > 0 
+                                    ? formatDuration(totalMin)
+                                    : 'No time';
+                                })()}
+                              </span>
+                              {job.location && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  {job.location}
+                                </span>
+                              )}
+                              {(() => {
+                                const jobTime = new Date(job.createdAt);
+                                const hours = jobTime.getHours();
+                                const mins = jobTime.getMinutes();
+                                if (hours !== 0 || mins !== 0) {
+                                  return (
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3" />
+                                      {hours.toString().padStart(2, '0')}:{mins.toString().padStart(2, '0')}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              {job.sessions.length > 0 && (
+                                <span>{job.sessions.length} session{job.sessions.length !== 1 ? 's' : ''}</span>
+                              )}
+                              {job.synced === 0 && (
+                                <span className="text-primary">• Unsynced</span>
+                              )}
+                            </div>
+
+                            {job.notes && (
+                              <p 
+                                className="text-sm text-muted-fg line-clamp-2 cursor-pointer"
+                                onClick={() => onSelectJob(job.id)}
+                              >
+                                {job.notes}
+                              </p>
+                            )}
+
+                            {expandedJob === job.id && job.sessions.length > 0 && (
+                              <div className="pl-4 border-l-2 border-border space-y-0.5">
+                                {job.sessions.map((session, idx) => (
+                                  <div key={session.id} className={`text-xs ${!session.endedAt ? 'text-destructive font-medium' : 'text-muted-fg'}`}>
+                                    Session {idx + 1}: {formatDuration(session.durationMin || 0)}
+                                    {!session.endedAt && ' (RUNNING)'}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {job.sessions.length > 0 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedJob(expandedJob === job.id ? null : job.id);
+                                }}
+                                className="flex items-center gap-1 text-xs text-muted-fg hover:text-fg"
+                              >
+                                {expandedJob === job.id ? (
+                                  <><ChevronUp className="w-3 h-3" /> Hide sessions</>
+                                ) : (
+                                  <><ChevronDown className="w-3 h-3" /> Show sessions</>
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Button - col 3 */}
+                          <div className="flex flex-col items-center gap-0.5">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(job.id);
-                              }}
-                              className="p-2 text-destructive hover:bg-destructive/10 rounded-lg"
+                              onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
+                              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                                isActive 
+                                  ? 'bg-destructive text-white hover:bg-destructive/90' 
+                                  : 'bg-slate text-fg hover:bg-primary hover:text-dark'
+                              }`}
+                              title={isActive ? 'Stop timer' : 'Start timer'}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              {isActive ? (
+                                <Square className="w-4 h-4" />
+                              ) : (
+                                <Play className="w-4 h-4 ml-0.5" />
+                              )}
                             </button>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(job.id);
-                              }}
-                              className="p-2 text-muted-fg hover:text-destructive hover:bg-destructive/10 rounded-lg"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                            {isActive && activeTimers[job.id] && (
+                              <span className="text-xs font-mono font-medium text-destructive">
+                                {formatActiveTime(activeTimers[job.id])}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
