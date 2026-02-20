@@ -28,8 +28,26 @@ export async function signUpWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: typeof window !== 'undefined'
+        ? (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin)
+        : process.env.NEXT_PUBLIC_SITE_URL,
+    },
   });
   return { data, error };
+}
+
+export async function resetPassword(email: string) {
+  const redirectTo = typeof window !== 'undefined'
+    ? `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/reset-password`
+    : `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  return { error };
+}
+
+export async function updatePassword(newPassword: string) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  return { error };
 }
 
 export async function signOut() {

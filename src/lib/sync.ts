@@ -128,17 +128,6 @@ class SyncService {
     // Small delay to let Supabase process the write
     await new Promise(resolve => setTimeout(resolve, 500));
     await this.syncFromServer();
-
-    // Broadcast to other clients via database notify
-    if (this.userId) {
-      try {
-        await supabase.rpc('notify_job_change', {
-          user_id: this.userId
-        });
-      } catch (e) {
-        // RPC might not exist, ignore
-      }
-    }
   }
 
   public async syncFromServer() {
