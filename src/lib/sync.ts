@@ -293,10 +293,10 @@ class SyncService {
     };
   }
 
-  private localToSupabaseJob(job: Job, userId: string): any {
+  private localToSupabaseJob(job: Job, deviceId: string): any {
     return {
       id: job.id,
-      user_id: userId,
+      user_id: deviceId,
       client_ref: job.clientRef,
       client_name: job.clientName,
       notes: job.notes,
