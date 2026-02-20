@@ -38,6 +38,7 @@ export interface VoiceNote {
 }
 
 export interface Client {
+  id?: string;
   ref: string;
   name: string;
   lastUsedAt: number;
