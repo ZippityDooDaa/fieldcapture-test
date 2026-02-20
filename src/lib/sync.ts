@@ -54,8 +54,11 @@ class SyncService {
           this.handleRealtimeUpdate(payload);
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         console.log('[Sync] Real-time subscription status:', status);
+        if (err) {
+          console.error('[Sync] Real-time subscription error:', err);
+        }
       });
   }
 
@@ -103,17 +106,38 @@ class SyncService {
     }, POLL_INTERVAL);
   }
 
+  // Fast poll when timers are active
+  startFastPolling() {
+    if (this.pollTimer) {
+      window.clearInterval(this.pollTimer);
+    }
+    this.pollTimer = window.setInterval(() => {
+      this.syncFromServer();
+    }, 3000); // 3 second polling when active
+  }
+
+  stopFastPolling() {
+    if (this.pollTimer) {
+      window.clearInterval(this.pollTimer);
+    }
+    this.startPolling(); // Back to 30s
+  }
+
   async forceSync() {
     await this.syncToServer();
+    // Small delay to let Supabase process the write
+    await new Promise(resolve => setTimeout(resolve, 500));
     await this.syncFromServer();
-    
-    // Broadcast to other clients
+
+    // Broadcast to other clients via database notify
     if (this.userId) {
-      await supabase.channel('sync-broadcast').send({
-        type: 'broadcast',
-        event: 'force-sync',
-        payload: { userId: this.userId, timestamp: new Date().toISOString() },
-      });
+      try {
+        await supabase.rpc('notify_job_change', {
+          user_id: this.userId
+        });
+      } catch (e) {
+        // RPC might not exist, ignore
+      }
     }
   }
 
