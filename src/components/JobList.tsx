@@ -267,7 +267,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                 <div className="px-4 py-2 text-xs font-medium text-muted-fg uppercase tracking-wider">
                   {label}
                 </div>
-                <div className="space-y-1">
+                <div>
                   {dateJobs.map((job) => {
                     const isActive = hasActiveSession(job);
                     const activeSession = getActiveSession(job);
@@ -275,11 +275,11 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                     return (
                     <div
                       key={job.id}
-                      className={`group px-4 py-3 hover:bg-slate/50 transition-colors ${
+                      className={`group px-4 py-2 hover:bg-slate/50 transition-colors ${
                         job.completed ? 'opacity-50' : ''
                       } ${isActive ? 'bg-destructive/5' : ''}`}
                     >
-                      <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-start">
+                      <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-start">
                         {/* Checkbox - col 1 */}
                         <button
                           onClick={(e) => toggleComplete(job, e)}
@@ -332,7 +332,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                           </div>
                           
                           {/* Meta row */}
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-fg flex-wrap">
+                          <div className="flex items-center gap-2 text-xs text-muted-fg flex-wrap">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {(() => {
@@ -379,7 +379,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                           {/* Notes preview */}
                           {job.notes && (
                             <p 
-                              className="text-sm text-muted-fg mt-1 line-clamp-2 cursor-pointer"
+                              className="text-sm text-muted-fg line-clamp-2 cursor-pointer"
                               onClick={() => onSelectJob(job.id)}
                             >
                               {job.notes}
@@ -388,7 +388,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
 
                           {/* Expanded sessions */}
                           {expandedJob === job.id && job.sessions.length > 0 && (
-                            <div className="mt-2 pl-4 border-l-2 border-border space-y-1">
+                            <div className="pl-4 border-l-2 border-border space-y-0.5">
                               {job.sessions.map((session, idx) => (
                                 <div key={session.id} className={`text-xs ${!session.endedAt ? 'text-destructive font-medium' : 'text-muted-fg'}`}>
                                   Session {idx + 1}: {formatDuration(session.durationMin || 0)}
@@ -405,7 +405,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                                 e.stopPropagation();
                                 setExpandedJob(expandedJob === job.id ? null : job.id);
                               }}
-                              className="mt-1 flex items-center gap-1 text-xs text-muted-fg hover:text-fg"
+                              className="flex items-center gap-1 text-xs text-muted-fg hover:text-fg"
                             >
                               {expandedJob === job.id ? (
                                 <><ChevronUp className="w-3 h-3" /> Hide sessions</>
