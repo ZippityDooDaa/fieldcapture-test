@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS } from '@/types';
 import { createJob, updateJob, getAllClients, seedClients, updateClientLastUsed, initDB, parseHotText } from '@/lib/storage';
+import { syncService } from '@/lib/sync';
 import { v4 as uuidv4 } from 'uuid';
 import { ArrowLeft, ChevronDown, Calendar, Clock, Flag, MapPin } from 'lucide-react';
 
@@ -173,6 +174,10 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     }
 
     await updateClientLastUsed(data.clientRef);
+    
+    // Sync to server
+    await syncService.syncToServer();
+    
     setLoading(false);
     onSave();
   }

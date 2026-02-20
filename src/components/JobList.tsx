@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Job, PRIORITY_COLORS, TimeSession } from '@/types';
 import { getAllJobs, deleteJob, createJob, initDB, updateJob, createSession, endSession, calculateTotalDuration, hasActiveSession, getActiveSession } from '@/lib/storage';
+import { syncService } from '@/lib/sync';
+import { getCurrentUser } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { 
   Trash2, 
@@ -20,7 +22,8 @@ import {
   Square,
   AlertCircle,
   MapPin,
-  Undo2
+  Undo2,
+  RefreshCw
 } from 'lucide-react';
 
 interface JobListProps {
@@ -39,6 +42,9 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [activeTimers, setActiveTimers] = useState<Record<string, number>>({});
   const [deletedJob, setDeletedJob] = useState<{ job: Job; timeoutId: number } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Update active timers every second
   useEffect(() => {
@@ -59,6 +65,30 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   useEffect(() => {
     loadJobs();
   }, [refreshTrigger]);
+
+  // Initialize sync service
+  useEffect(() => {
+    const initSync = async () => {
+      const user = await getCurrentUser();
+      if (user) {
+        await syncService.init(user.id);
+        setLastSync(new Date());
+      }
+    };
+    initSync();
+    
+    // Listen for sync updates
+    const handleSyncUpdate = () => {
+      loadJobs();
+      setLastSync(new Date());
+    };
+    window.addEventListener('jobs-updated', handleSyncUpdate);
+    
+    return () => {
+      syncService.cleanup();
+      window.removeEventListener('jobs-updated', handleSyncUpdate);
+    };
+  }, []);
 
   async function loadJobs() {
     setLoading(true);
@@ -192,6 +222,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
     // Set up 5-second undo window
     const timeoutId = window.setTimeout(async () => {
       await deleteJob(jobId);
+      // Trigger sync after permanent delete
+      await syncService.syncToServer();
       setDeletedJob(null);
     }, 5000);
     
@@ -257,6 +289,32 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                 Undo
               </button>
             )}
+            <button
+              onClick={async () => {
+                setIsSyncing(true);
+                setSyncError(null);
+                try {
+                  await syncService.forceSync();
+                  setLastSync(new Date());
+                } catch (err) {
+                  setSyncError('Sync failed');
+                } finally {
+                  setIsSyncing(false);
+                }
+              }}
+              disabled={isSyncing}
+              className={`px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm flex items-center gap-1 ${
+                syncError 
+                  ? 'bg-destructive text-white' 
+                  : isSyncing 
+                    ? 'bg-muted text-muted-fg' 
+                    : 'bg-slate text-fg hover:bg-slate/80'
+              }`}
+              title={lastSync ? `Last sync: ${lastSync.toLocaleTimeString()}` : 'Sync now'}
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              {syncError ? '!' : ''}
+            </button>
             <button
               onClick={onCreateNew}
               className="bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm"

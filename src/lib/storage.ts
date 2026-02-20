@@ -137,6 +137,13 @@ export async function getAllJobs(): Promise<Job[]> {
   return jobs.map(migrateJob);
 }
 
+export async function saveJobs(jobs: Job[]): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('jobs', 'readwrite');
+  await Promise.all(jobs.map(job => tx.store.put(job)));
+  await tx.done;
+}
+
 export async function getUnsyncedJobs(): Promise<Job[]> {
   const db = await initDB();
   const jobs = await db.getAllFromIndex('jobs', 'by-synced', 0);
@@ -250,6 +257,13 @@ export async function addClient(client: Client): Promise<void> {
 export async function getAllClients(): Promise<Client[]> {
   const db = await initDB();
   return db.getAll('clients');
+}
+
+export async function saveClients(clients: Client[]): Promise<void> {
+  const db = await initDB();
+  const tx = db.transaction('clients', 'readwrite');
+  await Promise.all(clients.map(client => tx.store.put(client)));
+  await tx.done;
 }
 
 export async function updateClientLastUsed(ref: string): Promise<void> {

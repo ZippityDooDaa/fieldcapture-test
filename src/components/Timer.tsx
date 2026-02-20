@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Job, TimeSession } from '@/types';
 import { updateJob, createSession, endSession, calculateTotalDuration, formatDurationLong } from '@/lib/storage';
+import { syncService } from '@/lib/sync';
 import { Play, Square, RotateCcw, Clock, ChevronDown, ChevronUp, Edit2, Check, X } from 'lucide-react';
 
 interface TimerProps {
@@ -169,6 +170,7 @@ export default function Timer({ job, onUpdate }: TimerProps) {
       sessions: [...job.sessions, newSession],
     };
     await updateJob(updatedJob);
+    await syncService.syncToServer();
     setIsRunning(true);
     setElapsed(0);
     onUpdate();
@@ -191,6 +193,7 @@ export default function Timer({ job, onUpdate }: TimerProps) {
     };
     
     await updateJob(updatedJob);
+    await syncService.syncToServer();
     setIsRunning(false);
     setElapsed(endedSession.durationMin ? endedSession.durationMin * 60 : 0);
     onUpdate();
@@ -210,6 +213,7 @@ export default function Timer({ job, onUpdate }: TimerProps) {
     };
     
     await updateJob(updatedJob);
+    await syncService.syncToServer();
     setEditingSession(null);
     onUpdate();
   }
@@ -227,6 +231,7 @@ export default function Timer({ job, onUpdate }: TimerProps) {
     };
     
     await updateJob(updatedJob);
+    await syncService.syncToServer();
     onUpdate();
   }
 
