@@ -220,12 +220,12 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   return (
     <div className="h-full flex flex-col bg-bg">
       {/* Header */}
-      <div className="bg-card border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-bold text-fg">Job Tracka</h1>
+      <div className="bg-card border-b border-border px-3 py-2">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-lg font-bold text-fg">Job Tracka</h1>
           <button
             onClick={onCreateNew}
-            className="bg-primary text-dark px-4 py-2 rounded-lg font-medium active:opacity-90"
+            className="bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm"
           >
             + New
           </button>
@@ -239,7 +239,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
             placeholder="Search jobs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 bg-slate border border-border rounded-lg text-sm text-fg placeholder-muted-fg focus:outline-none focus:border-primary"
+            className="w-full pl-9 pr-9 py-1.5 bg-slate border border-border rounded-lg text-sm text-fg placeholder-muted-fg focus:outline-none focus:border-primary"
           />
           {searchTerm && (
             <button
@@ -263,8 +263,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
         ) : (
           <div className="divide-y divide-border">
             {Object.entries(groupedJobs).map(([dateKey, { label, jobs: dateJobs }]) => (
-              <div key={dateKey} className="py-2">
-                <div className="px-4 py-2 text-xs font-medium text-muted-fg uppercase tracking-wider">
+              <div key={dateKey}>
+                <div className="px-3 py-1 text-xs font-medium text-muted-fg uppercase tracking-wider">
                   {label}
                 </div>
                 <div>
@@ -275,11 +275,11 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                     return (
                     <div
                       key={job.id}
-                      className={`group px-4 py-2 hover:bg-slate/50 transition-colors ${
+                      className={`group px-3 py-1 hover:bg-slate/50 transition-colors ${
                         job.completed ? 'opacity-50' : ''
                       } ${isActive ? 'bg-destructive/5' : ''}`}
                     >
-                      <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-start">
+                      <div className="grid grid-cols-[auto_1fr_auto] gap-1.5 items-start">
                         {/* Checkbox - col 1 */}
                         <button
                           onClick={(e) => toggleComplete(job, e)}
@@ -417,10 +417,10 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                         </div>
 
                         {/* Button - col 3 */}
-                        <div className="flex flex-col items-center gap-1">
+                        <div className="flex flex-col items-center gap-0.5">
                           <button
                             onClick={(e) => isActive ? handleQuickStop(job, e) : handleQuickStart(job, e)}
-                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
                               isActive 
                                 ? 'bg-destructive text-white hover:bg-destructive/90' 
                                 : 'bg-slate text-fg hover:bg-primary hover:text-dark'
