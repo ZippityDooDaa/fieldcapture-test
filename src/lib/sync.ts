@@ -221,6 +221,7 @@ class SyncService {
           id: serverClient.id,
           ref: serverClient.ref,
           name: serverClient.name,
+          supportLevel: serverClient.support_level ?? 'BreakFix',
           createdAt: new Date(serverClient.created_at).getTime(),
           lastUsedAt: Date.now(), // Will be updated when used
         };

@@ -187,7 +187,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                       style={{
                         backgroundColor: SUPPORT_LEVEL_COLORS[level] + '20',
                         color: SUPPORT_LEVEL_COLORS[level],
-                        ringColor: newSupportLevel === level ? SUPPORT_LEVEL_COLORS[level] : undefined,
                       }}
                     >
                       {level === 'BreakFix' ? 'Break/Fix' : level}
@@ -295,7 +294,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                               style={{
                                 backgroundColor: SUPPORT_LEVEL_COLORS[level] + '20',
                                 color: SUPPORT_LEVEL_COLORS[level],
-                                ringColor: editSupportLevel === level ? SUPPORT_LEVEL_COLORS[level] : undefined,
                               }}
                             >
                               {level === 'BreakFix' ? 'Break/Fix' : level}

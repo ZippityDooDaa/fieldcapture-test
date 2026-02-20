@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useForm } from 'react-hook-form';
-import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS, SUPPORT_LEVEL_COLORS, SUPPORT_LEVEL_OPTIONS } from '@/types';
-import { createJob, updateJob, getAllClients, seedClients, updateClientLastUsed, initDB, parseHotText } from '@/lib/storage';
+import { useState, useEffect, useRef } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS, SUPPORT_LEVEL_COLORS } from '@/types';
+import { getAllClients, seedClients, updateClientLastUsed, parseHotText, updateJob, createJob, getJob } from '@/lib/storage';
 import { syncService } from '@/lib/sync';
-import { v4 as uuidv4 } from 'uuid';
-import { ArrowLeft, ChevronDown, Calendar, Clock, Flag, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, Clock, Flag, MapPin } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface JobFormProps {
   jobId?: string;
@@ -14,154 +14,170 @@ interface JobFormProps {
   onCancel: () => void;
 }
 
-interface FormData {
+interface JobFormData {
   clientRef: string;
   notes: string;
-  priority: number;
+  priority: string;
 }
 
 export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedClientName, setSelectedClientName] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [jobDate, setJobDate] = useState(() => {
-    // Use local date, not UTC
-    const d = new Date();
-    const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return localDate;
-  });
-  const [jobTime, setJobTime] = useState(() => {
-    // Default to 00:00 for new jobs (no specific time)
-    return '00:00';
-  });
   const [parsedPriority, setParsedPriority] = useState<number | null>(null);
   const [parsedDate, setParsedDate] = useState<Date | null>(null);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [clients] = useState<Client[]>([]);
-  const [clientSearch, setClientSearch] = useState('');
   const [location, setLocation] = useState<'OnSite' | 'Remote'>('OnSite');
-  const [parsedSupportLevel, setParsedSupportLevel] = useState<Client['supportLevel'] | null>(null);
   
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
+  const filteredClients = clients.filter(client => {
+    const searchLower = clientSearch.toLowerCase();
+    return (
+      client.name.toLowerCase().includes(searchLower) ||
+      client.ref.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const priorityOptions = [1, 2, 3, 4, 5] as const;
+
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { isSubmitting },
+  } = useForm<JobFormData>({
     defaultValues: {
       clientRef: '',
       notes: '',
-      priority: 5,
-    }
+      priority: '5',
+    },
   });
 
-  const selectedClientRef = watch('clientRef');
-  const priority = watch('priority');
   const notes = watch('notes');
+  const priority = watch('priority') as unknown as 1 | 2 | 3 | 4 | 5;
+  const clientRef = watch('clientRef');
 
   useEffect(() => {
+    seedClients();
     loadClients();
-    
-    // If editing, load existing job data
+  }, []);
+
+  useEffect(() => {
     if (jobId) {
       loadExistingJob();
     }
   }, [jobId]);
 
+  const [jobDate, setJobDate] = useState(() => {
+    const d = new Date();
+    const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return localDate;
+  });
+
+  const [jobTime, setJobTime] = useState('09:00');
+  const [parsedSupportLevel, setParsedSupportLevel] = useState<Client['supportLevel'] | null>(null);
+
+  async function loadClients() {
+    const allClients = await getAllClients();
+    setClients(allClients);
+  }
+
   async function loadExistingJob() {
-    if (!jobId) return;
     const { getJob } = await import('@/lib/storage');
-    const existing = await getJob(jobId);
+    const existing = await getJob(jobId!);
     if (existing) {
       setValue('clientRef', existing.clientRef);
       setValue('notes', existing.notes);
-      setValue('priority', existing.priority);
+      setValue('priority', String(existing.priority));
       setLocation(existing.location || 'OnSite');
-      
-      const jobDateObj = new Date(existing.createdAt);
-      // Use local date, not UTC
-      const localDate = `${jobDateObj.getFullYear()}-${String(jobDateObj.getMonth() + 1).padStart(2, '0')}-${String(jobDateObj.getDate()).padStart(2, '0')}`;
+      const d = new Date(existing.createdAt);
+      const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       setJobDate(localDate);
-      const hours = jobDateObj.getHours().toString().padStart(2, '0');
-      const mins = jobDateObj.getMinutes().toString().padStart(2, '0');
+      const hours = d.getHours().toString().padStart(2, '0');
+      const mins = d.getMinutes().toString().padStart(2, '0');
       setJobTime(`${hours}:${mins}`);
     }
   }
 
-  useEffect(() => {
-    const client = clients.find(c => c.ref === selectedClientRef);
-    setSelectedClientName(client?.name || '');
-  }, [selectedClientRef, clients]);
+  async function handleClientSelect(client: Client) {
+    setValue('clientRef', client.ref);
+    setClientSearch('');
+    setShowClientDropdown(false);
+    // Update last used
+    await updateClientLastUsed(client.ref);
+  }
 
-  // Parse hot text in notes
+  function handlePrioritySelect(priority: 1 | 2 | 3 | 4 | 5) {
+    setValue('priority', String(priority));
+    setShowPriorityDropdown(false);
+  }
+
+  // Parse hot text in notes - only when text gets shorter (hot text was removed)
   const notesInputRef = useRef<HTMLTextAreaElement>(null);
   const lastNotesLength = useRef<number>(0);
   
   useEffect(() => {
     if (!notes) return;
     
-    // Only process if text got shorter (hot text was removed) or on initial load
     if (notes.length < lastNotesLength.current || lastNotesLength.current === 0) {
       lastNotesLength.current = notes.length;
       return;
     }
     lastNotesLength.current = notes.length;
     
-    // Check for hot text patterns
     const hasHotText = /\bP[1-5]\b|\btod(?:ay)?\b|\btom(?:orrow)?\b|\bnext week\b|\bnext\s+(?:sun|mon|tue|wed|thu|fri|sat)\b/i.test(notes);
     
     if (hasHotText) {
       const parsed = parseHotText(notes);
       if (parsed.priority) {
         setParsedPriority(parsed.priority);
-        setValue('priority', parsed.priority);
+        setValue('priority', String(parsed.priority));
       }
       if (parsed.date) {
         setParsedDate(parsed.date);
-        // Format date properly for local timezone
         const d = parsed.date;
         const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         setJobDate(localDate);
       }
-      // Don't auto-remove hot text anymore - let user see it highlighted
+      if (parsed.text !== notes) {
+        setValue('notes', parsed.text, { shouldValidate: false });
+      }
     }
   }, [notes, setValue]);
 
-  async function loadClients() {
-    await initDB();
-    await seedClients();
-    const allClients = await getAllClients();
-    // Sort by lastUsedAt desc
-    allClients.sort((a, b) => b.lastUsedAt - a.lastUsedAt);
-    setClients(allClients);
-  }
-
-  async function onSubmit(data: FormData) {
-    setLoading(true);
-    
-    const client = clients.find(c => c.ref === data.clientRef);
-    if (!client) return;
-
+  async function onSubmit(data: JobFormData) {
     const dateTime = new Date(`${jobDate}T${jobTime}`);
-    const now = Date.now();
+    
+    // Check if client exists
+    const client = clients.find(c => c.ref === data.clientRef);
+    if (!client) {
+      alert('Please select a valid client');
+      return;
+    }
+    
+    // Update client last used
+    await updateClientLastUsed(data.clientRef);
     
     if (jobId) {
-      // Update existing
-      const existing = await import('@/lib/storage').then(m => m.getJob(jobId));
+      const existing = await getJob(jobId);
       if (existing) {
-        const dateTime = new Date(`${jobDate}T${jobTime}`);
         await updateJob({
           ...existing,
           clientRef: data.clientRef,
           clientName: client.name,
           notes: data.notes,
-          priority: data.priority as 1 | 2 | 3 | 4 | 5,
+          priority: data.priority as unknown as 1 | 2 | 3 | 4 | 5,
           createdAt: dateTime.getTime(),
           location,
           synced: 0,
         });
+        await syncService.syncToServer();
+        await syncService.forceSync();
       }
     } else {
-      // Create new
+
       const newJob: Job = {
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         clientRef: data.clientRef,
         clientName: client.name,
         createdAt: dateTime.getTime(),
@@ -169,85 +185,82 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
         totalDurationMin: 0,
         notes: data.notes,
         synced: 0,
-        priority: data.priority as 1 | 2 | 3 | 4 | 5,
+        priority: data.priority as unknown as 1 | 2 | 3 | 4 | 5,
         completed: false,
         completedAt: null,
         location,
       };
       await createJob(newJob);
+      await syncService.syncToServer();
+      await syncService.forceSync();
     }
-
-    await updateClientLastUsed(data.clientRef);
     
-    // Sync to server
-    await syncService.syncToServer();
+    setParsedPriority(null);
+    setParsedDate(null);
+    setJobDate(() => {
+      const d = new Date();
+      const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return localDate;
+    });
+    setJobTime('09:00');
+    setValue('notes', '');
+    setValue('priority', '5');
+    setValue('clientRef', '');
     
-    setLoading(false);
     onSave();
   }
 
-  function handleClientSelect(client: Client) {
-    setValue('clientRef', client.ref);
-    setShowClientDropdown(false);
-  }
-
-  function handlePrioritySelect(p: number) {
-    setValue('priority', p);
-    setShowPriorityDropdown(false);
-    setParsedPriority(null);
-  }
-
-  const priorityOptions = [1, 2, 3, 4, 5];
-
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* Header */}
-      <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="bg-card border-b border-border px-3 py-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onCancel}
+              className="p-2 -ml-2 hover:bg-slate rounded-full transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-fg" />
+            </button>
+            <h1 className="text-lg font-bold" style={{ color: '#a8d600' }}>
+              {jobId ? 'Edit Job' : 'New Job'}
+            </h1>
+          </div>
           <button
-            onClick={onCancel}
-            className="p-2 -ml-2 hover:bg-slate rounded-full transition-colors"
+            onClick={handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+            className="flex items-center gap-1.5 bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90"
           >
-            <ArrowLeft className="w-5 h-5 text-fg" />
+            <Save className="w-4 h-4" />
+            <span className="hidden sm:inline">Save</span>
+            <span className="sm:hidden">✓</span>
           </button>
-          <h1 className="text-lg font-semibold text-fg">
-            {jobId ? 'Edit Job' : 'New Job'}
-          </h1>
         </div>
-        <button
-          onClick={handleSubmit(onSubmit)}
-          disabled={loading || !selectedClientRef}
-          className="bg-primary text-dark px-4 py-2 rounded-lg font-medium text-sm disabled:opacity-50"
-        >
-          {loading ? 'Saving...' : 'Save'}
-        </button>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
-          {/* Client Select */}
+          {/* Client Search */}
           <div>
             <label className="block text-sm font-medium text-fg mb-1">
-              Client <span className="text-destructive">*</span>
+              <MapPin className="w-4 h-4 inline mr-1" />
+              Client
             </label>
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowClientDropdown(!showClientDropdown)}
-                className={`w-full px-4 py-3 border rounded-lg text-left flex items-center justify-between bg-card ${
-                  errors.clientRef ? 'border-destructive' : 'border-border'
-                }`}
-              >
-                <span className={selectedClientName ? 'text-fg' : 'text-muted-fg'}>
-                  {selectedClientName || 'Select a client...'}
-                </span>
-                <ChevronDown className={`w-5 h-5 text-muted-fg transition-transform ${showClientDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {showClientDropdown && (
+              <input
+                type="text"
+                value={clientSearch}
+                onChange={(e) => {
+                  setClientSearch(e.target.value);
+                  setShowClientDropdown(true);
+                }}
+                onFocus={() => setShowClientDropdown(true)}
+                onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
+                placeholder="Search by name or reference..."
+                className="w-full px-3 py-2 bg-slate border border-border rounded-lg text-sm text-fg placeholder-muted-fg focus:outline-none focus:border-primary"
+              />
+              {showClientDropdown && filteredClients.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {clients.map((client) => (
+                  {filteredClients.map((client) => (
                     <button
                       key={client.ref}
                       type="button"
@@ -270,48 +283,16 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
                   ))}
                 </div>
               )}
-            </div>
-            <input type="hidden" {...register('clientRef', { required: 'Please select a client' })} />
-            {errors.clientRef && (
-              <p className="text-destructive text-sm mt-1">{errors.clientRef.message}</p>
-            )}
-          </div>
-
-          {/* Date & Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                Date
-                {parsedDate && (
-                  <span className="text-primary ml-1 text-xs">
-                    (auto-date)
+              {clientRef && clients.length > 0 && (
+                <div className="mt-1">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ 
+                    backgroundColor: SUPPORT_LEVEL_COLORS[clients.find(c => c.ref === clientRef)?.supportLevel || 'BreakFix'] + '20',
+                    color: SUPPORT_LEVEL_COLORS[clients.find(c => c.ref === clientRef)?.supportLevel || 'BreakFix']
+                  }}>
+                    {clientRef}
                   </span>
-                )}
-              </label>
-              <input
-                type="date"
-                value={jobDate}
-                onChange={(e) => {
-                  setJobDate(e.target.value);
-                  setParsedDate(null);
-                }}
-                className="w-full px-3 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary text-base"
-                style={{ minWidth: '140px' }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">
-                <Clock className="w-4 h-4 inline mr-1" />
-                Time
-              </label>
-              <input
-                type="time"
-                value={jobTime}
-                onChange={(e) => setJobTime(e.target.value)}
-                className="w-full px-3 py-3 bg-card text-fg border border-border rounded-lg focus:outline-none focus:border-primary text-base"
-                style={{ minWidth: '100px' }}
-              />
+                </div>
+              )}
             </div>
           </div>
 
@@ -327,39 +308,22 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
               )}
             </label>
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-                className="w-full px-4 py-3 border border-border rounded-lg text-left flex items-center justify-between bg-card"
-              >
-                <span className="flex items-center gap-2">
-                  <span 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: PRIORITY_COLORS[priority as keyof typeof PRIORITY_COLORS] }}
-                  />
-                  <span className="text-fg">{PRIORITY_LABELS[priority as keyof typeof PRIORITY_LABELS]}</span>
-                </span>
-                <ChevronDown className={`w-5 h-5 text-muted-fg transition-transform ${showPriorityDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {showPriorityDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
-                  {priorityOptions.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => handlePrioritySelect(p)}
-                      className="w-full px-4 py-3 text-left hover:bg-slate border-b border-border last:border-0 flex items-center gap-2"
-                    >
-                      <span 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: PRIORITY_COLORS[p as keyof typeof PRIORITY_COLORS] }}
-                      />
-                      <span className="text-fg">{PRIORITY_LABELS[p as keyof typeof PRIORITY_LABELS]}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <Controller
+                name="priority"
+                control={control}
+                render={({ field }) => (
+                  <select
+                    {...field}
+                    className="w-full px-3 py-2 bg-slate border border-border rounded-lg text-sm text-fg focus:outline-none focus:border-primary"
+                  >
+                    {priorityOptions.map((p) => (
+                      <option key={p} value={p}>
+                        {PRIORITY_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              />
             </div>
           </div>
 
@@ -395,50 +359,61 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
             </div>
           </div>
 
+          {/* Date & Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                Date
+                {parsedDate && (
+                  <span className="text-primary ml-1 text-xs">
+                    (auto)
+                  </span>
+                )}
+              </label>
+              <input
+                type="date"
+                value={jobDate}
+                onChange={(e) => setJobDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate border border-border rounded-lg text-sm text-fg focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">
+                <Clock className="w-4 h-4 inline mr-1" />
+                Time
+              </label>
+              <input
+                type="time"
+                value={jobTime}
+                onChange={(e) => setJobTime(e.target.value)}
+                className="w-full px-3 py-2 bg-slate border border-border rounded-lg text-sm text-fg focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-fg mb-1">
-              Notes
-            </label>
+            <label className="block text-sm font-medium text-fg mb-1">Notes</label>
             <textarea
-              {...register('notes')}
-              name="notes"
-              id="job-notes"
-              rows={6}
-              className="w-full px-4 py-3 bg-card text-fg border border-border rounded-lg resize-none focus:outline-none focus:border-primary"
-              placeholder={`Add notes...\n\nHot text:\n• tod = today, tom = tomorrow\n• next thu = next Thursday\n• next week = next Tuesday\n• P1-P5 = priority level`}
-              style={{ WebkitAppearance: 'none', appearance: 'none' }}
+              ref={notesInputRef}
+              value={notes}
+              onChange={(e) => setValue('notes', e.target.value, { shouldValidate: false })}
+              placeholder="Job details..."
+              className="w-full px-3 py-2 bg-slate border border-border rounded-lg text-sm text-fg placeholder-muted-fg focus:outline-none focus:border-primary h-32 resize-none"
             />
+            {parsedPriority && (
+              <div className="mt-1 text-xs text-primary">
+                Detected P{parsedPriority} priority
+              </div>
+            )}
+            {parsedDate && (
+              <div className="mt-1 text-xs text-primary">
+                Detected {parsedDate.toLocaleDateString()}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Click outside to close dropdowns */}
-        {(showClientDropdown || showPriorityDropdown) && (
-          <div 
-            className="fixed inset-0 z-0" 
-            onClick={() => {
-              setShowClientDropdown(false);
-              setShowPriorityDropdown(false);
-            }}
-          />
-        )}
-      </form>
-
-      {/* Footer */}
-      <div className="bg-card border-t border-border p-4 space-y-2 safe-area-pb">
-        <button
-          onClick={handleSubmit(onSubmit)}
-          disabled={loading || !selectedClientRef}
-          className="w-full bg-primary text-dark py-3 rounded-lg font-medium text-lg disabled:opacity-50 active:opacity-90"
-        >
-          {loading ? 'Saving...' : jobId ? 'Save Changes' : 'Create Job'}
-        </button>
-        <button
-          onClick={onCancel}
-          className="w-full bg-muted text-fg py-3 rounded-lg font-medium"
-        >
-          Cancel
-        </button>
       </div>
     </div>
   );
