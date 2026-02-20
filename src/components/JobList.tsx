@@ -93,9 +93,17 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
     };
     window.addEventListener('jobs-updated', handleSyncUpdate);
     
+    // Listen for sync errors
+    const handleSyncError = (e: any) => {
+      console.error('[Sync] Error:', e.detail);
+      setSyncError(e.detail || 'Sync failed');
+    };
+    window.addEventListener('sync-error', handleSyncError);
+    
     return () => {
       syncService.cleanup();
       window.removeEventListener('jobs-updated', handleSyncUpdate);
+      window.removeEventListener('sync-error', handleSyncError);
     };
   }, []);
 

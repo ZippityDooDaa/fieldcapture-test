@@ -171,8 +171,9 @@ class SyncService {
       // Sync clients too
       await this.syncClientsFromServer();
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Sync] Error fetching from server:', err);
+      window.dispatchEvent(new CustomEvent('sync-error', { detail: err.message || 'Unknown error' }));
     } finally {
       this.syncInProgress = false;
       
