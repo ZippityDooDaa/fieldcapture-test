@@ -41,6 +41,7 @@ export interface Client {
   id?: string;
   ref: string;
   name: string;
+  createdAt: number;
   lastUsedAt: number;
 }
 

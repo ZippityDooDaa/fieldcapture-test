@@ -5,11 +5,11 @@ import { Job, PRIORITY_COLORS, TimeSession } from '@/types';
 import { getAllJobs, deleteJob, createJob, initDB, updateJob, createSession, endSession, calculateTotalDuration, hasActiveSession, getActiveSession } from '@/lib/storage';
 import { syncService } from '@/lib/sync';
 import { format } from 'date-fns';
-import { 
-  Trash2, 
-  Search, 
-  X, 
-  CheckCircle2, 
+import {
+  Trash2,
+  Search,
+  X,
+  CheckCircle2,
   Circle,
   Clock,
   Calendar,
@@ -22,7 +22,8 @@ import {
   AlertCircle,
   MapPin,
   Undo2,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 
 interface JobListProps {
@@ -30,9 +31,11 @@ interface JobListProps {
   onEditJob?: (jobId: string) => void;
   onCreateNew: () => void;
   refreshTrigger: number;
+  userId: string;
+  onLogout?: () => void;
 }
 
-export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTrigger }: JobListProps) {
+export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTrigger, userId, onLogout }: JobListProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -69,14 +72,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   useEffect(() => {
     const initSync = async () => {
       try {
-        // Get or create device ID
-        let deviceId = localStorage.getItem('jobtracka-device-id');
-        if (!deviceId) {
-          deviceId = crypto.randomUUID();
-          localStorage.setItem('jobtracka-device-id', deviceId);
-        }
-        
-        await syncService.init(deviceId);
+        await syncService.init(userId);
         setLastSync(new Date());
         setSyncError(null);
       } catch (err) {
@@ -332,6 +328,15 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
               {syncError ? '!' : ''}
             </button>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm flex items-center gap-1 bg-slate text-muted-fg hover:bg-slate/80"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={onCreateNew}
               className="bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm"

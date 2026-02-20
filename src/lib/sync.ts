@@ -133,6 +133,7 @@ class SyncService {
       const { data: serverJobs, error } = await supabase
         .from('jobs')
         .select('*')
+        .eq('user_id', this.userId)
         .gt('updated_at', this.lastSyncAt)
         .order('updated_at', { ascending: true });
 
@@ -187,7 +188,8 @@ class SyncService {
   private async syncClientsFromServer() {
     const { data: serverClients, error } = await supabase
       .from('clients')
-      .select('*');
+      .select('*')
+      .eq('user_id', this.userId);
 
     if (error) {
       console.error('[Sync] Error fetching clients:', error);
@@ -286,7 +288,7 @@ class SyncService {
       sessions: [], // Sessions stored in notes for now, or extend schema later
       totalDurationMin: 0, // Calculate from sessions
       notes: record.notes,
-      synced: new Date(record.synced_at).getTime(),
+      synced: record.synced_at ? new Date(record.synced_at).getTime() : 0,
       priority: record.priority as 1 | 2 | 3 | 4 | 5,
       completed: record.completed,
       completedAt: record.completed_at ? new Date(record.completed_at).getTime() : null,

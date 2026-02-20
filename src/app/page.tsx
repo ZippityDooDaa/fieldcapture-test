@@ -6,12 +6,16 @@ import JobForm from '@/components/JobForm';
 import Timer from '@/components/Timer';
 import CameraComponent from '@/components/Camera';
 import VoiceRecorder from '@/components/VoiceRecorder';
+import AuthScreen from '@/components/AuthScreen';
 import { Job, PRIORITY_COLORS } from '@/types';
 import { getJob, updateJob, initDB, seedClients, getUnsyncedJobs, formatDuration } from '@/lib/storage';
 import { syncService } from '@/lib/sync';
-import { ArrowLeft, Save, Cloud, CloudOff, Check, Flag, Clock, Calendar } from 'lucide-react';
+import { getCurrentUser, onAuthStateChange, signOut } from '@/lib/supabase';
+import { ArrowLeft, Save, Cloud, CloudOff, Check, Flag, Clock, Calendar, LogOut } from 'lucide-react';
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [selectedJobId, setSelectedJobId] = useState<string | undefined>(undefined);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
@@ -23,8 +27,22 @@ export default function Home() {
   const [syncStatus, setSyncStatus] = useState<'synced' | 'unsynced' | 'syncing'>('synced');
 
   useEffect(() => {
-    initDatabase();
+    getCurrentUser().then((u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    const subscription = onAuthStateChange((u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      initDatabase();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (dbReady) {
@@ -135,6 +153,25 @@ export default function Home() {
     setView('form');
   }
 
+  async function handleLogout() {
+    await signOut();
+    setUser(null);
+    setView('list');
+  }
+
+  // Auth gate
+  if (authLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-bg">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen onAuth={setUser} />;
+  }
+
   // List View
   if (view === 'list') {
     return (
@@ -144,6 +181,8 @@ export default function Home() {
           onEditJob={handleEditJob}
           onCreateNew={handleCreateNew}
           refreshTrigger={refreshTrigger}
+          userId={user.id}
+          onLogout={handleLogout}
         />
         
         {/* Sync Bar */}
