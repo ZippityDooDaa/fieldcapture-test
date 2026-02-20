@@ -4,7 +4,16 @@ import { Database } from './database.types';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+// Log if env vars are missing (for debugging)
+if (typeof window !== 'undefined') {
+  console.log('[Supabase] URL exists:', !!supabaseUrl);
+  console.log('[Supabase] Key exists:', !!supabaseKey);
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[Supabase] Missing environment variables!');
+  }
+}
+
+export const supabase = createClient<Database>(supabaseUrl || '', supabaseKey || '');
 
 // Auth helpers
 export async function signInWithEmail(email: string, password: string) {
