@@ -41,9 +41,19 @@ export interface Client {
   id?: string;
   ref: string;
   name: string;
+  supportLevel: 'Managed' | 'Maintenance' | 'BreakFix';
   createdAt: number;
   lastUsedAt: number;
 }
+
+// Support level colors
+export const SUPPORT_LEVEL_COLORS = {
+  Managed: '#22c55e',     // Green
+  Maintenance: '#3b82f6', // Blue  
+  BreakFix: '#ef4444',    // Red
+} as const;
+
+export const SUPPORT_LEVEL_OPTIONS = ['Managed', 'Maintenance', 'BreakFix'] as const;
 
 export interface JobWithMedia {
   job: Job;

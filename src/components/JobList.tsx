@@ -132,6 +132,11 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
       const priorityDiff = a.priority - b.priority;
       if (priorityDiff !== 0) return priorityDiff;
       
+      // Then by time (earlier first within same priority)
+      const aTime = new Date(a.createdAt).getHours() * 60 + new Date(a.createdAt).getMinutes();
+      const bTime = new Date(b.createdAt).getHours() * 60 + new Date(b.createdAt).getMinutes();
+      if (aTime !== bTime) return aTime - bTime;
+      
       // Then by total duration (longest first)
       return b.totalDurationMin - a.totalDurationMin;
     });
@@ -312,7 +317,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
       {/* Header */}
       <div className="bg-card border-b border-border px-3 py-2">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-lg font-bold text-fg">Job Tracka</h1>
+          <h1 className="text-lg font-bold" style={{ color: '#a8d600' }}>Job Tracka</h1>
           <div className="flex items-center gap-2">
             {deletedJob && (
               <button

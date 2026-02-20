@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS } from '@/types';
+import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS, SUPPORT_LEVEL_COLORS, SUPPORT_LEVEL_OPTIONS } from '@/types';
 import { createJob, updateJob, getAllClients, seedClients, updateClientLastUsed, initDB, parseHotText } from '@/lib/storage';
 import { syncService } from '@/lib/sync';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,7 +38,11 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
   const [parsedPriority, setParsedPriority] = useState<number | null>(null);
   const [parsedDate, setParsedDate] = useState<Date | null>(null);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [clients] = useState<Client[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
   const [location, setLocation] = useState<'OnSite' | 'Remote'>('OnSite');
+  const [parsedSupportLevel, setParsedSupportLevel] = useState<Client['supportLevel'] | null>(null);
   
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -250,8 +254,18 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
                       onClick={() => handleClientSelect(client)}
                       className="w-full px-4 py-3 text-left hover:bg-slate border-b border-border last:border-0"
                     >
-                      <div className="font-medium text-fg">{client.name}</div>
-                      <div className="text-sm text-muted-fg">{client.ref}</div>
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className="font-bold px-2 py-0.5 rounded text-sm"
+                          style={{ 
+                            backgroundColor: SUPPORT_LEVEL_COLORS[client.supportLevel] + '20',
+                            color: SUPPORT_LEVEL_COLORS[client.supportLevel]
+                          }}
+                        >
+                          {client.ref}
+                        </span>
+                        <span className="text-fg">{client.name}</span>
+                      </div>
                     </button>
                   ))}
                 </div>

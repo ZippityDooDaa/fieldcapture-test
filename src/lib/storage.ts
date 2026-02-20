@@ -280,12 +280,22 @@ export async function seedClients(): Promise<void> {
   const existing = await getAllClients();
   if (existing.length === 0) {
     const defaultClients: Client[] = [
-      { ref: 'CLIENT001', name: 'ABC Plumbing', createdAt: 0, lastUsedAt: 0 },
-      { ref: 'CLIENT002', name: 'Smith Electrical', createdAt: 0, lastUsedAt: 0 },
-      { ref: 'CLIENT003', name: 'Jones Construction', createdAt: 0, lastUsedAt: 0 },
+      { ref: 'CLIENT001', name: 'ABC Plumbing', supportLevel: 'BreakFix', createdAt: 0, lastUsedAt: 0 },
+      { ref: 'CLIENT002', name: 'Smith Electrical', supportLevel: 'Managed', createdAt: 0, lastUsedAt: 0 },
+      { ref: 'CLIENT003', name: 'Jones Construction', supportLevel: 'Maintenance', createdAt: 0, lastUsedAt: 0 },
     ];
     const db = await initDB();
     await Promise.all(defaultClients.map(c => db.put('clients', c)));
+  } else {
+    // Migrate existing clients without supportLevel
+    const needsMigration = existing.filter(c => !c.supportLevel);
+    if (needsMigration.length > 0) {
+      const db = await initDB();
+      for (const client of needsMigration) {
+        client.supportLevel = 'BreakFix';
+        await db.put('clients', client);
+      }
+    }
   }
 }
 

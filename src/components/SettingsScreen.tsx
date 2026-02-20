@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Client } from '@/types';
-import { getAllClients, saveClients, updateClientLastUsed } from '@/lib/storage';
-import { ArrowLeft, Plus, Trash2, Edit2, Check, X, Building2 } from 'lucide-react';
+import { Client, SUPPORT_LEVEL_COLORS, SUPPORT_LEVEL_OPTIONS } from '@/types';
+import { getAllClients, saveClients } from '@/lib/storage';
+import { ArrowLeft, Plus, Trash2, Edit2, Check, X, Building2, ArrowUpDown } from 'lucide-react';
 
 interface SettingsScreenProps {
   onBack: () => void;
 }
+
+type SortField = 'name' | 'ref' | 'lastUsed';
 
 export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [clients, setClients] = useState<Client[]>([]);
@@ -15,20 +17,44 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingRef, setEditingRef] = useState<string | null>(null);
   
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>('lastUsed');
+  const [sortReverse, setSortReverse] = useState(false);
+  
   // Form state
   const [newRef, setNewRef] = useState('');
   const [newName, setNewName] = useState('');
+  const [newSupportLevel, setNewSupportLevel] = useState<Client['supportLevel']>('BreakFix');
   const [editName, setEditName] = useState('');
+  const [editSupportLevel, setEditSupportLevel] = useState<Client['supportLevel']>('BreakFix');
 
   useEffect(() => {
     loadClients();
-  }, []);
+  }, [sortField, sortReverse]);
 
   async function loadClients() {
     setLoading(true);
-    const allClients = await getAllClients();
-    // Sort by last used (most recent first)
-    allClients.sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
+    let allClients = await getAllClients();
+    
+    // Sort clients
+    allClients.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'ref':
+          comparison = a.ref.localeCompare(b.ref);
+          break;
+        case 'lastUsed':
+          comparison = (b.lastUsedAt || 0) - (a.lastUsedAt || 0);
+          break;
+      }
+      
+      return sortReverse ? -comparison : comparison;
+    });
+    
     setClients(allClients);
     setLoading(false);
   }
@@ -49,6 +75,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       id: crypto.randomUUID(),
       ref,
       name: newName.trim(),
+      supportLevel: newSupportLevel,
       createdAt: Date.now(),
       lastUsedAt: 0,
     };
@@ -60,6 +87,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     // Reset form
     setNewRef('');
     setNewName('');
+    setNewSupportLevel('BreakFix');
     setIsAdding(false);
   }
 
@@ -67,7 +95,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     if (!editName.trim()) return;
     
     const updatedClients = clients.map(c => 
-      c.ref === client.ref ? { ...c, name: editName.trim() } : c
+      c.ref === client.ref 
+        ? { ...c, name: editName.trim(), supportLevel: editSupportLevel }
+        : c
     );
     
     await saveClients(updatedClients);
@@ -96,7 +126,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
             >
               <ArrowLeft className="w-5 h-5 text-fg" />
             </button>
-            <h1 className="text-lg font-bold text-fg">Settings</h1>
+            <h1 className="text-lg font-bold" style={{ color: '#a8d600' }}>Settings</h1>
           </div>
           <button
             onClick={() => setIsAdding(true)}
@@ -141,6 +171,30 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                   required
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-fg mb-1">Support Level</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {SUPPORT_LEVEL_OPTIONS.map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setNewSupportLevel(level)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        newSupportLevel === level
+                          ? 'ring-2 ring-offset-1 ring-offset-bg'
+                          : 'opacity-70 hover:opacity-100'
+                      }`}
+                      style={{
+                        backgroundColor: SUPPORT_LEVEL_COLORS[level] + '20',
+                        color: SUPPORT_LEVEL_COLORS[level],
+                        ringColor: newSupportLevel === level ? SUPPORT_LEVEL_COLORS[level] : undefined,
+                      }}
+                    >
+                      {level === 'BreakFix' ? 'Break/Fix' : level}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
@@ -154,6 +208,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                     setIsAdding(false);
                     setNewRef('');
                     setNewName('');
+                    setNewSupportLevel('BreakFix');
                   }}
                   className="px-4 py-2 bg-slate text-fg rounded-lg font-medium text-sm border border-border"
                 >
@@ -164,13 +219,31 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           </div>
         )}
 
-        {/* Clients List */}
+        {/* Clients List Header with Sort */}
         <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="px-4 py-2 bg-slate border-b border-border">
+          <div className="px-4 py-2 bg-slate border-b border-border flex items-center justify-between">
             <h2 className="font-semibold text-fg flex items-center gap-2">
               <Building2 className="w-4 h-4" />
               Clients ({clients.length})
             </h2>
+            <div className="flex items-center gap-2">
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value as SortField)}
+                className="bg-slate border border-border rounded px-2 py-1 text-sm text-fg"
+              >
+                <option value="lastUsed">Most Used</option>
+                <option value="name">Name</option>
+                <option value="ref">Ref</option>
+              </select>
+              <button
+                onClick={() => setSortReverse(!sortReverse)}
+                className={`p-1.5 rounded transition-colors ${sortReverse ? 'bg-primary text-dark' : 'bg-slate text-fg'}`}
+                title={sortReverse ? 'Reverse order' : 'Normal order'}
+              >
+                <ArrowUpDown className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           
           {loading ? (
@@ -184,45 +257,95 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               {clients.map((client) => (
                 <div
                   key={client.ref}
-                  className="px-4 py-3 flex items-center justify-between hover:bg-slate/50 transition-colors"
+                  className="px-4 py-3 hover:bg-slate/50 transition-colors"
                 >
                   {editingRef === client.ref ? (
-                    <div className="flex-1 flex items-center gap-2">
-                      <span className="text-sm font-medium text-muted-fg">{client.ref}</span>
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="flex-1 px-2 py-1 bg-slate border border-border rounded text-sm text-fg"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => handleEditClient(client)}
-                        className="p-1.5 text-primary hover:bg-primary/10 rounded"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingRef(null);
-                          setEditName('');
-                        }}
-                        className="p-1.5 text-muted-fg hover:bg-slate rounded"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className="text-sm font-bold px-2 py-0.5 rounded"
+                          style={{ 
+                            backgroundColor: SUPPORT_LEVEL_COLORS[client.supportLevel] + '20',
+                            color: SUPPORT_LEVEL_COLORS[client.supportLevel]
+                          }}
+                        >
+                          {client.ref}
+                        </span>
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="flex-1 px-2 py-1 bg-slate border border-border rounded text-sm text-fg"
+                          autoFocus
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-fg mb-1 block">Support Level</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {SUPPORT_LEVEL_OPTIONS.map((level) => (
+                            <button
+                              key={level}
+                              type="button"
+                              onClick={() => setEditSupportLevel(level)}
+                              className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                                editSupportLevel === level
+                                  ? 'ring-2 ring-offset-1 ring-offset-bg'
+                                  : 'opacity-70 hover:opacity-100'
+                              }`}
+                              style={{
+                                backgroundColor: SUPPORT_LEVEL_COLORS[level] + '20',
+                                color: SUPPORT_LEVEL_COLORS[level],
+                                ringColor: editSupportLevel === level ? SUPPORT_LEVEL_COLORS[level] : undefined,
+                              }}
+                            >
+                              {level === 'BreakFix' ? 'Break/Fix' : level}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditClient(client)}
+                          className="flex-1 bg-primary text-dark py-1.5 rounded text-sm font-medium"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingRef(null);
+                            setEditName('');
+                          }}
+                          className="px-4 py-1.5 bg-slate text-fg rounded text-sm border border-border"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <>
+                    <div className="flex items-center justify-between">
                       <div className="min-w-0">
-                        <div className="font-medium text-fg truncate">{client.name}</div>
-                        <div className="text-xs text-muted-fg">{client.ref}</div>
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="text-sm font-bold px-2 py-0.5 rounded"
+                            style={{ 
+                              backgroundColor: SUPPORT_LEVEL_COLORS[client.supportLevel] + '20',
+                              color: SUPPORT_LEVEL_COLORS[client.supportLevel]
+                            }}
+                          >
+                            {client.ref}
+                          </span>
+                          <span className="font-medium text-fg truncate">{client.name}</span>
+                        </div>
+                        <div className="text-xs text-muted-fg mt-0.5">
+                          {client.supportLevel === 'BreakFix' ? 'Break/Fix' : client.supportLevel}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
                             setEditingRef(client.ref);
                             setEditName(client.name);
+                            setEditSupportLevel(client.supportLevel);
                           }}
                           className="p-2 text-muted-fg hover:text-fg hover:bg-slate rounded-lg transition-colors"
                           title="Edit"
@@ -237,7 +360,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               ))}
