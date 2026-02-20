@@ -286,6 +286,9 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
     return groups;
   }, {} as Record<string, { label: string; jobs: Job[] }>);
 
+  // Sort date keys chronologically (newest first)
+  const sortedDateKeys = Object.keys(groupedJobs).sort((a, b) => b.localeCompare(a));
+
   return (
     <div className="h-full flex flex-col bg-bg">
       {/* Header */}
@@ -377,7 +380,9 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {Object.entries(groupedJobs).map(([dateKey, { label, jobs: dateJobs }]) => (
+            {sortedDateKeys.map((dateKey) => {
+              const { label, jobs: dateJobs } = groupedJobs[dateKey];
+              return (
               <div key={dateKey}>
                 <div className="px-3 py-1 text-xs font-medium text-muted-fg uppercase tracking-wider">
                   {label}
@@ -596,7 +601,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
