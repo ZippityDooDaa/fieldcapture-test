@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Client, SUPPORT_LEVEL_COLORS, SUPPORT_LEVEL_OPTIONS } from '@/types';
-import { getAllClients, saveClients } from '@/lib/storage';
+import { getAllClients, saveClients, getAllJobs, saveJobs } from '@/lib/storage';
 import { ArrowLeft, Plus, Trash2, Edit2, Check, X, Building2, ArrowUpDown } from 'lucide-react';
 
 interface SettingsScreenProps {
@@ -93,14 +93,25 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
 
   async function handleEditClient(client: Client) {
     if (!editName.trim()) return;
-    
-    const updatedClients = clients.map(c => 
-      c.ref === client.ref 
-        ? { ...c, name: editName.trim(), supportLevel: editSupportLevel }
+
+    const newName = editName.trim();
+    const updatedClients = clients.map(c =>
+      c.ref === client.ref
+        ? { ...c, name: newName, supportLevel: editSupportLevel }
         : c
     );
-    
+
     await saveClients(updatedClients);
+
+    // Cascade name change to local jobs immediately (server handles this via trigger)
+    if (client.name !== newName) {
+      const allJobs = await getAllJobs();
+      const affected = allJobs.map(j =>
+        j.clientRef === client.ref ? { ...j, clientName: newName, synced: 0 } : j
+      );
+      await saveJobs(affected);
+    }
+
     setClients(updatedClients);
     setEditingRef(null);
     setEditName('');

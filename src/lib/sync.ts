@@ -205,7 +205,9 @@ class SyncService {
     const { data: serverClients, error } = await supabase
       .from('clients')
       .select('*')
-      .eq('user_id', this.userId);
+      .eq('user_id', this.userId)
+      .gt('updated_at', this.lastSyncAt)
+      .order('updated_at', { ascending: true });
 
     if (error) {
       console.error('[Sync] Error fetching clients:', error);
@@ -214,7 +216,7 @@ class SyncService {
 
     if (serverClients && serverClients.length > 0) {
       const localClients = await getLocalClients();
-      
+
       for (const serverClient of serverClients as any[]) {
         const existingIndex = localClients.findIndex(c => c.ref === serverClient.ref);
         const client: Client = {
@@ -223,15 +225,19 @@ class SyncService {
           name: serverClient.name,
           supportLevel: serverClient.support_level ?? 'BreakFix',
           createdAt: new Date(serverClient.created_at).getTime(),
-          lastUsedAt: Date.now(), // Will be updated when used
+          // Preserve local lastUsedAt — server doesn't track this
+          lastUsedAt: existingIndex >= 0 ? localClients[existingIndex].lastUsedAt : 0,
         };
-        
-        if (existingIndex === -1) {
-          // Only add clients that don't exist locally; local edits take precedence
+
+        if (existingIndex >= 0) {
+          // Accept server version: we only receive records newer than lastSyncAt,
+          // meaning they changed on the server after our last push (e.g. cascade trigger)
+          localClients[existingIndex] = client;
+        } else {
           localClients.push(client);
         }
       }
-      
+
       await saveClients(localClients);
     }
   }
