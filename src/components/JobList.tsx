@@ -19,7 +19,8 @@ import {
   Play,
   Square,
   AlertCircle,
-  MapPin
+  MapPin,
+  Undo2
 } from 'lucide-react';
 
 interface JobListProps {
@@ -33,11 +34,11 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [swipedJob, setSwipedJob] = useState<string | null>(null);
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [activeTimers, setActiveTimers] = useState<Record<string, number>>({});
+  const [deletedJob, setDeletedJob] = useState<{ job: Job; timeoutId: number } | null>(null);
 
   // Update active timers every second
   useEffect(() => {
@@ -176,14 +177,35 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
   );
 
   async function handleDelete(jobId: string) {
-    if (deleteConfirm === jobId) {
-      await deleteJob(jobId);
-      setDeleteConfirm(null);
-      await loadJobs();
-    } else {
-      setDeleteConfirm(jobId);
-      setTimeout(() => setDeleteConfirm(null), 3000);
+    const jobToDelete = jobs.find(j => j.id === jobId);
+    if (!jobToDelete) return;
+    
+    // Clear any existing undo timeout
+    if (deletedJob?.timeoutId) {
+      window.clearTimeout(deletedJob.timeoutId);
     }
+    
+    // Remove job from UI immediately
+    setJobs(jobs.filter(j => j.id !== jobId));
+    setSwipedJob(null);
+    
+    // Set up 5-second undo window
+    const timeoutId = window.setTimeout(async () => {
+      await deleteJob(jobId);
+      setDeletedJob(null);
+    }, 5000);
+    
+    setDeletedJob({ job: jobToDelete, timeoutId });
+  }
+  
+  function handleUndoDelete() {
+    if (deletedJob?.timeoutId) {
+      window.clearTimeout(deletedJob.timeoutId);
+    }
+    if (deletedJob?.job) {
+      setJobs(prev => [...prev, deletedJob.job]);
+    }
+    setDeletedJob(null);
   }
 
   function formatDuration(minutes: number): string {
@@ -302,45 +324,18 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                         className={`absolute inset-y-0 left-0 bg-destructive flex items-center px-4 transition-transform duration-200 ${
                           isSwiped ? 'translate-x-0' : '-translate-x-full'
                         }`}
-                        style={{ width: isSwiped && deleteConfirm === job.id ? '100%' : '80px' }}
+                        style={{ width: '80px' }}
                       >
-                        {deleteConfirm === job.id ? (
-                          <div className="flex items-center gap-4 w-full justify-center">
-                            <span className="text-white font-medium">Delete this job?</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(job.id);
-                                setSwipedJob(null);
-                                setDeleteConfirm(null);
-                              }}
-                              className="px-4 py-2 bg-white text-destructive rounded-lg font-medium"
-                            >
-                              Delete
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteConfirm(null);
-                                setSwipedJob(null);
-                              }}
-                              className="px-4 py-2 bg-destructive/50 text-white border border-white/30 rounded-lg font-medium"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteConfirm(job.id);
-                            }}
-                            className="flex flex-col items-center gap-1 text-white"
-                          >
-                            <Trash2 className="w-6 h-6" />
-                            <span className="text-xs font-medium">Delete</span>
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(job.id);
+                          }}
+                          className="flex flex-col items-center gap-1 text-white"
+                        >
+                          <Trash2 className="w-6 h-6" />
+                          <span className="text-xs font-medium">Delete</span>
+                        </button>
                       </div>
 
                       {/* Job Content - slides to reveal delete */}
@@ -517,12 +512,24 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
 
       {/* Bottom action bar */}
       <div className="bg-card border-t border-border p-4 safe-area-pb">
-        <button
-          onClick={onCreateNew}
-          className="w-full bg-primary text-dark py-3 rounded-lg font-medium text-lg active:opacity-90"
-        >
-          Start New Job
-        </button>
+        {deletedJob ? (
+          <div className="flex gap-3">
+            <button
+              onClick={handleUndoDelete}
+              className="flex-1 bg-slate text-fg py-3 rounded-lg font-medium text-base flex items-center justify-center gap-2 active:opacity-90 border border-border"
+            >
+              <Undo2 className="w-5 h-5" />
+              Undo Delete ({deletedJob.job.clientName})
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onCreateNew}
+            className="w-full bg-primary text-dark py-3 rounded-lg font-medium text-lg active:opacity-90"
+          >
+            Start New Job
+          </button>
+        )}
       </div>
     </div>
   );
