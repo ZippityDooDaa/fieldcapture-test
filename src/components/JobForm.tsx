@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { Job, Client, PRIORITY_COLORS, PRIORITY_LABELS } from '@/types';
 import { createJob, updateJob, getAllClients, seedClients, updateClientLastUsed, initDB, parseHotText } from '@/lib/storage';
 import { v4 as uuidv4 } from 'uuid';
-import { ArrowLeft, ChevronDown, Calendar, Clock, Flag } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Calendar, Clock, Flag, MapPin } from 'lucide-react';
 
 interface JobFormProps {
   jobId?: string;
@@ -37,6 +37,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
   const [parsedPriority, setParsedPriority] = useState<number | null>(null);
   const [parsedDate, setParsedDate] = useState<Date | null>(null);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [location, setLocation] = useState<'OnSite' | 'Remote'>('OnSite');
   
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -67,6 +68,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
       setValue('clientRef', existing.clientRef);
       setValue('notes', existing.notes);
       setValue('priority', existing.priority);
+      setLocation(existing.location || 'OnSite');
       
       const jobDateObj = new Date(existing.createdAt);
       // Use local date, not UTC
@@ -147,6 +149,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
           notes: data.notes,
           priority: data.priority as 1 | 2 | 3 | 4 | 5,
           createdAt: dateTime.getTime(),
+          location,
           synced: 0,
         });
       }
@@ -164,6 +167,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
         priority: data.priority as 1 | 2 | 3 | 4 | 5,
         completed: false,
         completedAt: null,
+        location,
       };
       await createJob(newJob);
     }
@@ -337,6 +341,38 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">
+              <MapPin className="w-4 h-4 inline mr-1" />
+              Location
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setLocation('OnSite')}
+                className={`px-4 py-3 rounded-lg font-medium transition-colors ${
+                  location === 'OnSite'
+                    ? 'bg-primary text-dark'
+                    : 'bg-card border border-border text-fg hover:bg-slate'
+                }`}
+              >
+                On Site
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocation('Remote')}
+                className={`px-4 py-3 rounded-lg font-medium transition-colors ${
+                  location === 'Remote'
+                    ? 'bg-primary text-dark'
+                    : 'bg-card border border-border text-fg hover:bg-slate'
+                }`}
+              >
+                Remote
+              </button>
             </div>
           </div>
 

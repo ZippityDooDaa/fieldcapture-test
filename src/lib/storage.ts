@@ -108,6 +108,7 @@ export function migrateJob(oldJob: any): Job {
     priority: oldJob.priority || 5,
     completed: oldJob.completed || false,
     completedAt: oldJob.completedAt || null,
+    location: oldJob.location || 'OnSite',
   };
 }
 

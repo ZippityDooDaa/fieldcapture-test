@@ -17,6 +17,7 @@ export interface Job {
   priority: 1 | 2 | 3 | 4 | 5;
   completed: boolean;
   completedAt: number | null;
+  location: 'OnSite' | 'Remote';
 }
 
 export interface Photo {

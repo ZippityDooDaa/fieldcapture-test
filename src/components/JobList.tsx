@@ -18,7 +18,8 @@ import {
   ChevronUp,
   Play,
   Square,
-  AlertCircle
+  AlertCircle,
+  MapPin
 } from 'lucide-react';
 
 interface JobListProps {
@@ -118,6 +119,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
         priority: job.priority,
         completed: false,
         completedAt: null,
+        location: job.location || 'OnSite',
       };
       await createJob(newJob);
       await loadJobs();
@@ -330,7 +332,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                           </div>
                           
                           {/* Meta row */}
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-fg">
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-fg flex-wrap">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {(() => {
@@ -344,6 +346,13 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                                   : 'No time';
                               })()}
                             </span>
+                            {/* Location */}
+                            {job.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {job.location}
+                              </span>
+                            )}
                             {/* Show scheduled time if set (not 00:00) */}
                             {(() => {
                               const jobTime = new Date(job.createdAt);
