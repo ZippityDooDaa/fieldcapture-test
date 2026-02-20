@@ -319,7 +319,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-lg font-bold" style={{ color: '#a8d600' }}>Job Tracka</h1>
           <div className="flex items-center gap-2">
-            {deletedJob && (
+            {deletedJob ? (
               <button
                 onClick={handleUndoDelete}
                 className="bg-destructive text-white px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm flex items-center gap-1"
@@ -327,7 +327,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                 <Undo2 className="w-4 h-4" />
                 Undo
               </button>
-            )}
+            ) : (
+              <>
             <button
               onClick={async () => {
                 setIsSyncing(true);
@@ -378,6 +379,8 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
             >
               + New
             </button>
+              </>
+            )}
           </div>
         </div>
         

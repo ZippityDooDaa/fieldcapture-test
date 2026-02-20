@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Client, SUPPORT_LEVEL_COLORS, SUPPORT_LEVEL_OPTIONS } from '@/types';
 import { getAllClients, saveClients, getAllJobs, saveJobs } from '@/lib/storage';
+import { syncService } from '@/lib/sync';
 import { ArrowLeft, Plus, Trash2, Edit2, Check, X, Building2, ArrowUpDown } from 'lucide-react';
 
 interface SettingsScreenProps {
@@ -110,8 +111,17 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         j.clientRef === client.ref ? { ...j, clientName: newName, synced: 0 } : j
       );
       await saveJobs(affected);
+<<<<<<< HEAD
     }
 
+=======
+      window.dispatchEvent(new CustomEvent('jobs-updated'));
+    }
+
+    // Push to server so the DB cascade trigger fires for remote sessions
+    syncService.syncToServer();
+
+>>>>>>> f6b8ce2 (Hide header buttons when undo is showing)
     setClients(updatedClients);
     setEditingRef(null);
     setEditName('');

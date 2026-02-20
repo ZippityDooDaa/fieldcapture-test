@@ -87,6 +87,7 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
     const existing = await getJob(jobId!);
     if (existing) {
       setValue('clientRef', existing.clientRef);
+      setClientSearch(existing.clientName);
       setValue('notes', existing.notes);
       setValue('priority', String(existing.priority));
       setLocation(existing.location || 'OnSite');
@@ -302,28 +303,28 @@ export default function JobForm({ jobId, onSave, onCancel }: JobFormProps) {
               <Flag className="w-4 h-4 inline mr-1" />
               Priority
               {parsedPriority && (
-                <span className="text-primary ml-1 text-xs">
-                  (auto)
-                </span>
+                <span className="text-primary ml-1 text-xs">(auto)</span>
               )}
             </label>
-            <div className="relative">
-              <Controller
-                name="priority"
-                control={control}
-                render={({ field }) => (
-                  <select
-                    {...field}
-                    className="w-full px-3 py-2 bg-slate border border-border rounded-lg text-sm text-fg focus:outline-none focus:border-primary"
+            <div className="grid grid-cols-5 gap-1.5">
+              {priorityOptions.map((p) => {
+                const selected = String(priority) === String(p);
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setValue('priority', String(p))}
+                    className="py-2 rounded-lg text-xs font-bold transition-all"
+                    style={{
+                      backgroundColor: selected ? PRIORITY_COLORS[p] : PRIORITY_COLORS[p] + '25',
+                      color: selected ? '#fff' : PRIORITY_COLORS[p],
+                      opacity: selected ? 1 : 0.7,
+                    }}
                   >
-                    {priorityOptions.map((p) => (
-                      <option key={p} value={p}>
-                        {PRIORITY_LABELS[p]}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              />
+                    P{p}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
