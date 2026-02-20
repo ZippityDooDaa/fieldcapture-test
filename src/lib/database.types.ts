@@ -31,6 +31,7 @@ export interface Database {
           created_at?: string
           user_id?: string
         }
+        Relationships: []
       }
       jobs: {
         Row: {
@@ -75,6 +76,7 @@ export interface Database {
           updated_at?: string
           synced_at?: string
         }
+        Relationships: []
       }
     }
     Views: {

@@ -186,6 +186,7 @@ class SyncService {
   }
 
   private async syncClientsFromServer() {
+    if (!this.userId) return;
     const { data: serverClients, error } = await supabase
       .from('clients')
       .select('*')
@@ -264,7 +265,6 @@ class SyncService {
         const { error } = await supabase
           .from('clients')
           .upsert({
-            id: client.id,
             ref: client.ref,
             name: client.name,
             user_id: this.userId,
