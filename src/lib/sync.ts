@@ -280,13 +280,28 @@ class SyncService {
   }
 
   private supabaseToLocalJob(record: any): Job {
+    // Parse sessions from JSONB
+    let sessions = [];
+    try {
+      if (record.sessions && Array.isArray(record.sessions)) {
+        sessions = record.sessions.map((s: any) => ({
+          id: s.id,
+          startedAt: new Date(s.startedAt).getTime(),
+          endedAt: s.endedAt ? new Date(s.endedAt).getTime() : null,
+          durationMin: s.durationMin,
+        }));
+      }
+    } catch (e) {
+      console.error('[Sync] Error parsing sessions:', e);
+    }
+
     return {
       id: record.id,
       clientRef: record.client_ref,
       clientName: record.client_name,
       createdAt: new Date(record.created_at).getTime(),
-      sessions: [], // Sessions stored in notes for now, or extend schema later
-      totalDurationMin: 0, // Calculate from sessions
+      sessions: sessions,
+      totalDurationMin: record.total_duration_min || 0,
       notes: record.notes,
       synced: record.synced_at ? new Date(record.synced_at).getTime() : 0,
       priority: record.priority as 1 | 2 | 3 | 4 | 5,
@@ -296,10 +311,18 @@ class SyncService {
     };
   }
 
-  private localToSupabaseJob(job: Job, deviceId: string): any {
+  private localToSupabaseJob(job: Job, userId: string): any {
+    // Serialize sessions for JSONB storage
+    const sessions = job.sessions.map(s => ({
+      id: s.id,
+      startedAt: new Date(s.startedAt).toISOString(),
+      endedAt: s.endedAt ? new Date(s.endedAt).toISOString() : null,
+      durationMin: s.durationMin,
+    }));
+
     return {
       id: job.id,
-      user_id: deviceId,
+      user_id: userId,
       client_ref: job.clientRef,
       client_name: job.clientName,
       notes: job.notes,
@@ -307,6 +330,8 @@ class SyncService {
       location: job.location,
       completed: job.completed,
       completed_at: job.completedAt ? new Date(job.completedAt).toISOString() : null,
+      sessions: sessions,
+      total_duration_min: job.totalDurationMin,
       created_at: new Date(job.createdAt).toISOString(),
       synced_at: new Date().toISOString(),
     };

@@ -44,6 +44,8 @@ export interface Database {
           location: string
           completed: boolean
           completed_at: string | null
+          sessions: any
+          total_duration_min: number
           created_at: string
           updated_at: string
           synced_at: string
@@ -58,6 +60,8 @@ export interface Database {
           location?: string
           completed?: boolean
           completed_at?: string | null
+          sessions?: any
+          total_duration_min?: number
           created_at?: string
           updated_at?: string
           synced_at?: string
@@ -72,6 +76,8 @@ export interface Database {
           location?: string
           completed?: boolean
           completed_at?: string | null
+          sessions?: any
+          total_duration_min?: number
           created_at?: string
           updated_at?: string
           synced_at?: string
