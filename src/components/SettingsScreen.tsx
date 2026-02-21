@@ -26,6 +26,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [newRef, setNewRef] = useState('');
   const [newName, setNewName] = useState('');
   const [newSupportLevel, setNewSupportLevel] = useState<Client['supportLevel']>('BreakFix');
+  const [editRef, setEditRef] = useState('');
   const [editName, setEditName] = useState('');
   const [editSupportLevel, setEditSupportLevel] = useState<Client['supportLevel']>('BreakFix');
 
@@ -93,32 +94,61 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   }
 
   async function handleEditClient(client: Client) {
-    if (!editName.trim()) return;
+    if (!editName.trim() || !editRef.trim()) return;
 
     const newName = editName.trim();
-    const updatedClients = clients.map(c =>
-      c.ref === client.ref
-        ? { ...c, name: newName, supportLevel: editSupportLevel }
-        : c
-    );
+    const newRef = editRef.trim().toUpperCase();
+    const oldRef = client.ref;
+
+    // Check if new ref already exists (and it's not the current client)
+    if (newRef !== oldRef && clients.some(c => c.ref === newRef)) {
+      alert('Client reference already exists');
+      return;
+    }
+
+    // Build updated client
+    const updatedClient: Client = {
+      ...client,
+      ref: newRef,
+      name: newName,
+      supportLevel: editSupportLevel,
+    };
+
+    // If ref changed, we need to remove old and add new
+    let updatedClients: Client[];
+    if (newRef !== oldRef) {
+      updatedClients = clients.filter(c => c.ref !== oldRef);
+      updatedClients.push(updatedClient);
+    } else {
+      updatedClients = clients.map(c =>
+        c.ref === oldRef ? updatedClient : c
+      );
+    }
 
     await saveClients(updatedClients);
 
-    // Cascade name change to local jobs immediately (server handles this via trigger)
-    if (client.name !== newName) {
-      const allJobs = await getAllJobs();
-      const affected = allJobs.map(j =>
-        j.clientRef === client.ref ? { ...j, clientName: newName, synced: 0 } : j
-      );
-      await saveJobs(affected);
-      window.dispatchEvent(new CustomEvent('jobs-updated'));
-    }
+    // Cascade changes to local jobs
+    const allJobs = await getAllJobs();
+    const affected = allJobs.map(j => {
+      if (j.clientRef === oldRef) {
+        return {
+          ...j,
+          clientRef: newRef,
+          clientName: newName,
+          synced: 0
+        };
+      }
+      return j;
+    });
+    await saveJobs(affected);
+    window.dispatchEvent(new CustomEvent('jobs-updated'));
 
-    // Push to server so the DB cascade trigger fires for remote sessions
+    // Push to server
     syncService.syncToServer();
 
     setClients(updatedClients);
     setEditingRef(null);
+    setEditRef('');
     setEditName('');
   }
 
@@ -277,22 +307,21 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                   {editingRef === client.ref ? (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
-                        <span 
-                          className="text-sm font-bold px-2 py-0.5 rounded"
+                        <input
+                          type="text"
+                          value={editRef}
+                          onChange={(e) => setEditRef(e.target.value.toUpperCase())}
+                          className="w-24 px-2 py-1 bg-slate border border-border rounded text-sm text-fg font-bold"
                           style={{ 
-                            backgroundColor: SUPPORT_LEVEL_COLORS[client.supportLevel] + '20',
-                            color: SUPPORT_LEVEL_COLORS[client.supportLevel]
+                            backgroundColor: SUPPORT_LEVEL_COLORS[editSupportLevel] + '20',
+                            color: SUPPORT_LEVEL_COLORS[editSupportLevel]
                           }}
-                        >
-                          {client.ref}
-                        </span>
+                        />
                         <input
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="flex-1 px-2 py-1 bg-white border border-border rounded text-sm text-fg focus:outline-none focus:border-primary"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 px-2 py-1 bg-slate border border-border rounded text-sm text-fg"
                         />
                       </div>
                       <div>
@@ -320,18 +349,15 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditClient(client);
-                          }}
+                          onClick={() => handleEditClient(client)}
                           className="flex-1 bg-primary text-dark py-1.5 rounded text-sm font-medium"
                         >
                           Save
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() => {
                             setEditingRef(null);
+                            setEditRef('');
                             setEditName('');
                           }}
                           className="px-4 py-1.5 bg-slate text-fg rounded text-sm border border-border"
@@ -361,9 +387,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                       </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() => {
                             setEditingRef(client.ref);
+                            setEditRef(client.ref);
                             setEditName(client.name);
                             setEditSupportLevel(client.supportLevel);
                           }}
