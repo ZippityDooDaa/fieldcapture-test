@@ -280,9 +280,9 @@ export async function seedClients(): Promise<void> {
   const existing = await getAllClients();
   if (existing.length === 0) {
     const defaultClients: Client[] = [
-      { ref: 'CLIENT001', name: 'ABC Plumbing', supportLevel: 'BreakFix', createdAt: 0, lastUsedAt: 0 },
-      { ref: 'CLIENT002', name: 'Smith Electrical', supportLevel: 'Managed', createdAt: 0, lastUsedAt: 0 },
-      { ref: 'CLIENT003', name: 'Jones Construction', supportLevel: 'Maintenance', createdAt: 0, lastUsedAt: 0 },
+      { ref: 'CLIENT001', name: 'ABC Plumbing', supportLevel: 'BreakFix', createdAt: 0, lastUsedAt: 0, synced: 0 },
+      { ref: 'CLIENT002', name: 'Smith Electrical', supportLevel: 'Managed', createdAt: 0, lastUsedAt: 0, synced: 0 },
+      { ref: 'CLIENT003', name: 'Jones Construction', supportLevel: 'Maintenance', createdAt: 0, lastUsedAt: 0, synced: 0 },
     ];
     const db = await initDB();
     await Promise.all(defaultClients.map(c => db.put('clients', c)));

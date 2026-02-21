@@ -227,6 +227,7 @@ class SyncService {
           createdAt: new Date(serverClient.created_at).getTime(),
           // Preserve local lastUsedAt — server doesn't track this
           lastUsedAt: existingIndex >= 0 ? localClients[existingIndex].lastUsedAt : 0,
+          synced: Date.now(), // Mark as synced since it came from server
         };
 
         if (existingIndex >= 0) {
@@ -280,8 +281,9 @@ class SyncService {
     if (!this.userId) return;
     
     const localClients = await getLocalClients();
+    const unsyncedClients = localClients.filter(c => c.synced === 0 || !c.synced);
     
-    for (const client of localClients) {
+    for (const client of unsyncedClients) {
       try {
         const { error } = await supabase
           .from('clients')
@@ -294,11 +296,18 @@ class SyncService {
         
         if (error) {
           console.error('[Sync] Error upserting client:', error);
+          continue;
         }
+        
+        // Mark as synced
+        client.synced = Date.now();
       } catch (err) {
         console.error('[Sync] Error syncing client:', err);
       }
     }
+    
+    // Save updated sync timestamps
+    await saveClients(localClients);
   }
 
   private supabaseToLocalJob(record: any): Job {

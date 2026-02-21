@@ -44,6 +44,7 @@ export interface Client {
   supportLevel: 'Managed' | 'Maintenance' | 'BreakFix';
   createdAt: number;
   lastUsedAt: number;
+  synced?: number;
 }
 
 // Support level colors

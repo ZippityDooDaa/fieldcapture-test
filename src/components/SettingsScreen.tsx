@@ -80,6 +80,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       supportLevel: newSupportLevel,
       createdAt: Date.now(),
       lastUsedAt: 0,
+      synced: 0, // Mark as needing sync
     };
 
     const updatedClients = [...clients, newClient];
@@ -112,6 +113,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       ref: newRef,
       name: newName,
       supportLevel: editSupportLevel,
+      synced: 0, // Mark as needing sync
     };
 
     // If ref changed, we need to remove old and add new
