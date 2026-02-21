@@ -290,8 +290,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="flex-1 px-2 py-1 bg-slate border border-border rounded text-sm text-fg"
+                          className="flex-1 px-2 py-1 bg-white border border-border rounded text-sm text-fg focus:outline-none focus:border-primary"
                           autoFocus
+                          onClick={(e) => e.stopPropagation()}
                         />
                       </div>
                       <div>
@@ -319,13 +320,17 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleEditClient(client)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClient(client);
+                          }}
                           className="flex-1 bg-primary text-dark py-1.5 rounded text-sm font-medium"
                         >
                           Save
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingRef(null);
                             setEditName('');
                           }}
@@ -356,7 +361,8 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                       </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingRef(client.ref);
                             setEditName(client.name);
                             setEditSupportLevel(client.supportLevel);
