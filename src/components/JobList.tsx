@@ -329,24 +329,24 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
               </button>
             ) : (
               <>
-            <button
-              onClick={async () => {
-                setIsSyncing(true);
-                setSyncError(null);
-                try {
-                  await syncService.forceSync();
-                  setLastSync(new Date());
-                } catch (err) {
-                  setSyncError('Sync failed');
-                } finally {
-                  setIsSyncing(false);
-                }
-              }}
-              disabled={isSyncing}
-              className={`px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm flex items-center gap-1 ${
-                syncError 
-                  ? 'bg-destructive text-white' 
-                  : isSyncing 
+                <button
+                  onClick={async () => {
+                    setIsSyncing(true);
+                    setSyncError(null);
+                    try {
+                      await syncService.forceSync();
+                      setLastSync(new Date());
+                    } catch (err) {
+                      setSyncError('Sync failed');
+                    } finally {
+                      setIsSyncing(false);
+                    }
+                  }}
+                  disabled={isSyncing}
+                  className={`px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm flex items-center gap-1 ${
+                    syncError 
+                      ? 'bg-destructive text-white' 
+                      : isSyncing 
                     ? 'bg-muted text-muted-fg' 
                     : 'bg-slate text-fg hover:bg-slate/80'
               }`}
@@ -373,12 +373,12 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                 <Settings className="w-4 h-4" />
               </button>
             )}
-            <button
-              onClick={onCreateNew}
-              className="bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm"
-            >
-              + New
-            </button>
+                <button
+                  onClick={onCreateNew}
+                  className="bg-primary text-dark px-3 py-1.5 rounded-lg font-medium active:opacity-90 text-sm"
+                >
+                  + New
+                </button>
               </>
             )}
           </div>

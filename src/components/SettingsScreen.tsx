@@ -111,17 +111,12 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
         j.clientRef === client.ref ? { ...j, clientName: newName, synced: 0 } : j
       );
       await saveJobs(affected);
-<<<<<<< HEAD
-    }
-
-=======
       window.dispatchEvent(new CustomEvent('jobs-updated'));
     }
 
     // Push to server so the DB cascade trigger fires for remote sessions
     syncService.syncToServer();
 
->>>>>>> f6b8ce2 (Hide header buttons when undo is showing)
     setClients(updatedClients);
     setEditingRef(null);
     setEditName('');
