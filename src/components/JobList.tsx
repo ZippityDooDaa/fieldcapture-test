@@ -431,7 +431,7 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                     return (
                     <div
                       key={job.id}
-                      className="relative overflow-hidden"
+                      className="relative overflow-hidden cursor-pointer"
                       onTouchStart={(e) => {
                         setSwipeStartX(e.touches[0].clientX);
                       }}
@@ -447,6 +447,27 @@ export default function JobList({ onSelectJob, onEditJob, onCreateNew, refreshTr
                         }
                       }}
                       onTouchEnd={() => {
+                        setSwipeStartX(null);
+                      }}
+                      // Mouse drag for desktop
+                      onMouseDown={(e) => {
+                        setSwipeStartX(e.clientX);
+                      }}
+                      onMouseMove={(e) => {
+                        if (swipeStartX === null) return;
+                        const diff = e.clientX - swipeStartX;
+                        // Dragging right reveals delete (need 50px right drag)
+                        if (diff > 50) {
+                          setSwipedJob(job.id);
+                        } else if (diff < -30) {
+                          // Dragging left hides delete
+                          setSwipedJob(null);
+                        }
+                      }}
+                      onMouseUp={() => {
+                        setSwipeStartX(null);
+                      }}
+                      onMouseLeave={() => {
                         setSwipeStartX(null);
                       }}
                     >
